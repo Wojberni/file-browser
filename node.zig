@@ -1,10 +1,10 @@
-const File = @import("file.zig").File;
+const FileStruct = @import("file_struct.zig").FileStruct;
 
 pub const Node = struct {
-    value: File,
+    value: FileStruct,
     children: []Node,
 };
 
-pub fn newNode(value: File, children: []Node) Node {
+pub fn newNode(value: FileStruct, children: []Node) Node {
     return Node{ .value = value, .children = children };
 }
