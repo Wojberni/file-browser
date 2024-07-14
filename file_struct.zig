@@ -1,6 +1,4 @@
 const std = @import("std");
-const Dir = std.fs.Dir;
-const File = std.fs.File;
 
 pub const FileStruct = struct {
     name: []u8,
@@ -8,8 +6,8 @@ pub const FileStruct = struct {
 };
 
 pub const FileUnion = union(enum) {
-    dir: Dir,
-    file: File,
+    dir: std.fs.Dir,
+    file: std.fs.File,
 };
 
 pub fn newFileStruct(name: []u8, file_union: FileUnion) FileStruct {
