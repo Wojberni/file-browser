@@ -4,7 +4,7 @@ const Tree = @import("tree.zig");
 const FileUtils = @import("file_utils.zig");
 
 const ALLOCATOR = std.testing.allocator;
-pub const TEST_DIR_NAME = "tests";
+pub const TEST_DIR_NAME = "testing_dir";
 
 test "check if test files are initialized correctly" {
     var test_file_paths = std.ArrayList([]const u8).init(ALLOCATOR);
