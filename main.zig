@@ -15,9 +15,11 @@ pub fn main() !void {
     try FileUtils.createTestDirectoriesStructure(allocator, Tests.TEST_DIR_NAME, &test_file_paths);
 
     var tree = try Tree.initTree(allocator, Tests.TEST_DIR_NAME);
+    defer Node.deinitNodeChildren(allocator, &tree.root);
 
     try Node.addChildrenToNode(allocator, &tree.root);
     Node.traverseNodeChildren(&tree.root, 0);
+    Node.deinitNodeChildren(allocator, &tree.root);
 
     try FileUtils.cleanUp(Tests.TEST_DIR_NAME);
 }

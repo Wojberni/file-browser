@@ -10,7 +10,6 @@ fn newTree(root: Node.Node) Tree {
 
 pub fn initTree(allocator: std.mem.Allocator, root_dir_name: []const u8) !Tree {
     const current_dir = try std.fs.cwd().openDir(root_dir_name, .{ .iterate = true });
-    // defer current_dir.close();
 
     const current_path = try current_dir.realpathAlloc(allocator, ".");
     defer allocator.free(current_path);

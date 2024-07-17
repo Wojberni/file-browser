@@ -21,7 +21,6 @@ pub fn addChildrenToNode(allocator: std.mem.Allocator, root_node: *Node) !void {
     }
 
     root_node.children = try allocator.alloc(Node, counter);
-    // defer allocator.free(root_node.children);
 
     iterator = root_dir.iterate();
     counter = 0;
@@ -30,7 +29,6 @@ pub fn addChildrenToNode(allocator: std.mem.Allocator, root_node: *Node) !void {
         switch (entry.kind) {
             std.fs.File.Kind.directory => {
                 const entry_dir = try root_dir.openDir(entry.name, .{ .iterate = true });
-                // defer entry_dir.close();
 
                 const allocated_file_name = try allocator.alloc(u8, entry.name.len);
                 std.mem.copyForwards(u8, allocated_file_name, entry.name);
@@ -41,7 +39,6 @@ pub fn addChildrenToNode(allocator: std.mem.Allocator, root_node: *Node) !void {
             },
             std.fs.File.Kind.file => {
                 const entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_write });
-                // defer entry_file.close();
 
                 const allocated_file_name = try allocator.alloc(u8, entry.name.len);
                 std.mem.copyForwards(u8, allocated_file_name, entry.name);
@@ -73,4 +70,33 @@ pub fn traverseNodeChildren(node: *const Node, nested_level: u32) void {
             },
         }
     }
+}
+
+pub fn deinitNodeChildren(allocator: std.mem.Allocator, node: *const Node) void {
+    allocator.free(node.value.name);
+    switch (node.value.file_union) {
+        .dir => |dir| {
+            var node_dir = dir;
+            node_dir.close();
+        },
+        .file => |file| {
+            var node_file = file;
+            node_file.close();
+        },
+    }
+
+    for (node.children) |child| {
+        switch (child.value.file_union) {
+            .dir => {
+                deinitNodeChildren(allocator, &child);
+            },
+            .file => |file| {
+                allocator.free(child.value.name);
+                var child_file = file;
+                child_file.close();
+            },
+        }
+    }
+
+    allocator.free(node.children);
 }
