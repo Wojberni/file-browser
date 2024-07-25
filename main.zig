@@ -1,6 +1,5 @@
 const std = @import("std");
 const Tree = @import("tree.zig");
-const FileStruct = @import("file_struct.zig");
 const FileUtils = @import("file_utils.zig");
 const Node = @import("node.zig");
 const Tests = @import("tests.zig");
@@ -19,7 +18,6 @@ pub fn main() !void {
 
     try Node.addChildrenToNode(allocator, &tree.root);
     Node.traverseNodeChildren(&tree.root, 0);
-    Node.deinitNodeChildren(allocator, &tree.root);
 
     try FileUtils.cleanUp(Tests.TEST_DIR_NAME);
 }

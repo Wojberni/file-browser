@@ -23,10 +23,10 @@ test "check if tree is initialized correctly" {
     try FileUtils.createTestDirectoriesStructure(ALLOCATOR, TEST_DIR_NAME, &test_file_paths);
 
     var tree = try Tree.initTree(ALLOCATOR, TEST_DIR_NAME);
+    defer Node.deinitNodeChildren(ALLOCATOR, &tree.root);
 
     try Node.addChildrenToNode(ALLOCATOR, &tree.root);
     Node.traverseNodeChildren(&tree.root, 0);
-    Node.deinitNodeChildren(ALLOCATOR, &tree.root);
 
     try FileUtils.cleanUp(TEST_DIR_NAME);
 }
