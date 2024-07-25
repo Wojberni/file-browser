@@ -72,6 +72,30 @@ pub fn traverseNodeChildren(node: *const Node, nested_level: u32) void {
     }
 }
 
+pub fn findMatchingNodeByName(node: *const Node, name: []const u8) bool {
+    if (std.mem.eql(u8, node.value.name, name)) {
+        return true;
+    }
+    for (node.children) |child| {
+        switch (child.value.file_union) {
+            .dir => {
+                return findMatchingNodeByName(&child, name);
+            },
+            .file => {
+                if (std.mem.eql(u8, child.value.name, name)) {
+                    return true;
+                }
+            },
+        }
+    }
+    return false;
+}
+
+// TODO: to implement after refactor
+// pub fn findMatchingNodeByPath(node: *const Node, name: []const u8) void {
+
+// }
+
 pub fn deinitNodeChildren(allocator: std.mem.Allocator, node: *const Node) void {
     allocator.free(node.value.name);
     switch (node.value.file_union) {
