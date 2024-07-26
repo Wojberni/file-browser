@@ -23,12 +23,14 @@ pub const TestFileStructure = struct {
         return test_file_structure;
     }
 
-    pub fn deInit(self: *TestFileStructure) !void {
+    pub fn deinit(self: *TestFileStructure) void {
         defer self.test_dir.close();
         defer self.root_dir.close();
         defer self.file_paths.deinit();
 
-        try self.root_dir.deleteTree(self.test_dir_name);
+        self.root_dir.deleteTree(self.test_dir_name) catch |err| {
+            std.debug.print("Failed to delete test directory '{s}': {}\n", .{ self.test_dir_name, err });
+        };
     }
 
     fn initFilePaths(self: *TestFileStructure) !void {

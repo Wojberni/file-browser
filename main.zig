@@ -8,15 +8,14 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
     var test_file_structure = try TestStruct.TestFileStructure.init(allocator, Tests.TEST_DIR_NAME);
+    defer test_file_structure.deinit();
 
-    var tree = try Tree.initTree(allocator, Tests.TEST_DIR_NAME);
-    defer Node.deinitNodeChildren(allocator, &tree.root);
+    var tree = try Tree.Tree.init(allocator, Tests.TEST_DIR_NAME);
+    defer tree.deinit();
 
-    try Node.addChildrenToNode(allocator, &tree.root);
-    Node.traverseNodeChildren(&tree.root, 0);
+    try tree.root.addChildrenToNode();
+    tree.root.traverseNodeChildren(0);
 
-    std.debug.print("Found: '{s}': {}\n", .{ "thing", Node.findMatchingNodeByName(&tree.root, "thing") });
-    std.debug.print("Found: '{s}': {}\n", .{ "aha.txt", Node.findMatchingNodeByName(&tree.root, "aha.txt") });
-
-    try test_file_structure.deInit();
+    std.debug.print("Found: '{s}': {}\n", .{ "thing", tree.root.findMatchingNodeByName("thing") });
+    std.debug.print("Found: '{s}': {}\n", .{ "aha.txt", tree.root.findMatchingNodeByName("aha.txt") });
 }

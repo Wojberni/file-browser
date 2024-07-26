@@ -8,54 +8,50 @@ pub const TEST_DIR_NAME = "testing_dir";
 
 test "check if test files are initialized correctly" {
     var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
-    try test_file_structure.deInit();
+    defer test_file_structure.deinit();
 }
 
 test "check if tree can be initialized" {
     var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    defer test_file_structure.deinit();
 
-    var tree = try Tree.initTree(ALLOCATOR, TEST_DIR_NAME);
-    defer Node.deinitNodeChildren(ALLOCATOR, &tree.root);
+    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    defer tree.deinit();
 
-    try Node.addChildrenToNode(ALLOCATOR, &tree.root);
-
-    try test_file_structure.deInit();
+    try tree.root.addChildrenToNode();
 }
 
 test "check if tree is initialized correctly" {
     var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    defer test_file_structure.deinit();
 
-    var tree = try Tree.initTree(ALLOCATOR, TEST_DIR_NAME);
-    defer Node.deinitNodeChildren(ALLOCATOR, &tree.root);
+    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    defer tree.deinit();
 
-    try Node.addChildrenToNode(ALLOCATOR, &tree.root);
-    Node.traverseNodeChildren(&tree.root, 0);
-
-    try test_file_structure.deInit();
+    try tree.root.addChildrenToNode();
+    tree.root.traverseNodeChildren(0);
 }
 
 test "check if value can be found in tree" {
     var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    defer test_file_structure.deinit();
 
-    var tree = try Tree.initTree(ALLOCATOR, TEST_DIR_NAME);
-    defer Node.deinitNodeChildren(ALLOCATOR, &tree.root);
+    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    defer tree.deinit();
 
-    try Node.addChildrenToNode(ALLOCATOR, &tree.root);
-    const result = Node.findMatchingNodeByName(&tree.root, "install.txt");
+    try tree.root.addChildrenToNode();
+    const result = tree.root.findMatchingNodeByName("install.txt");
     try std.testing.expect(result);
-
-    try test_file_structure.deInit();
 }
 
 test "check if value cannot be found in tree" {
     var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    defer test_file_structure.deinit();
 
-    var tree = try Tree.initTree(ALLOCATOR, TEST_DIR_NAME);
-    defer Node.deinitNodeChildren(ALLOCATOR, &tree.root);
+    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    defer tree.deinit();
 
-    try Node.addChildrenToNode(ALLOCATOR, &tree.root);
-    const result = Node.findMatchingNodeByName(&tree.root, "aha.txt");
+    try tree.root.addChildrenToNode();
+    const result = tree.root.findMatchingNodeByName("aha.txt");
     try std.testing.expect(!result);
-
-    try test_file_structure.deInit();
 }
