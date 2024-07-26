@@ -1,7 +1,6 @@
 const std = @import("std");
 const Tree = @import("tree.zig");
 const TestStruct = @import("test_struct.zig");
-const Node = @import("node.zig");
 const Tests = @import("tests.zig");
 
 pub fn main() !void {
@@ -13,8 +12,8 @@ pub fn main() !void {
     var tree = try Tree.Tree.init(allocator, Tests.TEST_DIR_NAME);
     defer tree.deinit();
 
-    try tree.root.addChildrenToNode();
-    tree.root.traverseNodeChildren(0);
+    try tree.loadTreeFromDir();
+    tree.traverseTree();
 
     std.debug.print("Found: '{s}': {}\n", .{ "thing", tree.root.findMatchingNodeByName("thing") });
     std.debug.print("Found: '{s}': {}\n", .{ "aha.txt", tree.root.findMatchingNodeByName("aha.txt") });

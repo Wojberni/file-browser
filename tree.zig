@@ -5,10 +5,6 @@ const FileStruct = @import("file_struct.zig");
 pub const Tree = struct {
     root: Node.Node,
 
-    fn newTree(root: Node.Node) Tree {
-        return Tree{ .root = root };
-    }
-
     pub fn init(allocator: std.mem.Allocator, root_dir_name: []const u8) !Tree {
         const current_dir = try std.fs.cwd().openDir(root_dir_name, .{ .iterate = true });
 
@@ -20,14 +16,22 @@ pub const Tree = struct {
         const allocated_file_name = try allocator.alloc(u8, current_dir_name.len);
         std.mem.copyForwards(u8, allocated_file_name, current_dir_name);
 
-        const file_struct = FileStruct.newFileStruct(allocated_file_name, FileStruct.FileUnion{ .dir = current_dir });
+        const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .dir = current_dir });
 
         const node = Node.Node.init(allocator, file_struct, undefined);
 
-        return newTree(node);
+        return Tree{ .root = node };
     }
 
     pub fn deinit(self: *Tree) void {
         self.root.deinit();
+    }
+
+    pub fn traverseTree(self: *Tree) void {
+        self.root.traverseNodeChildren(0);
+    }
+
+    pub fn loadTreeFromDir(self: *Tree) !void {
+        try self.root.addChildrenToNode();
     }
 };

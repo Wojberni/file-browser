@@ -62,7 +62,7 @@ pub const Node = struct {
                     const allocated_file_name = try self.allocator.alloc(u8, entry.name.len);
                     std.mem.copyForwards(u8, allocated_file_name, entry.name);
 
-                    const file_struct = FileStruct.newFileStruct(allocated_file_name, FileStruct.FileUnion{ .dir = entry_dir });
+                    const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .dir = entry_dir });
                     self.children[counter] = Node.init(self.allocator, file_struct, undefined);
                     try self.children[counter].addChildrenToNode();
                 },
@@ -72,7 +72,7 @@ pub const Node = struct {
                     const allocated_file_name = try self.allocator.alloc(u8, entry.name.len);
                     std.mem.copyForwards(u8, allocated_file_name, entry.name);
 
-                    const file_struct = FileStruct.newFileStruct(allocated_file_name, FileStruct.FileUnion{ .file = entry_file });
+                    const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .file = entry_file });
                     self.children[counter] = Node.init(self.allocator, file_struct, undefined);
                 },
                 else => unreachable,

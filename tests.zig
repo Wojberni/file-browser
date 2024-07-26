@@ -1,5 +1,4 @@
 const std = @import("std");
-const Node = @import("node.zig");
 const Tree = @import("tree.zig");
 const TestStruct = @import("test_struct.zig");
 
@@ -18,7 +17,7 @@ test "check if tree can be initialized" {
     var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
-    try tree.root.addChildrenToNode();
+    try tree.loadTreeFromDir();
 }
 
 test "check if tree is initialized correctly" {
@@ -28,8 +27,8 @@ test "check if tree is initialized correctly" {
     var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
-    try tree.root.addChildrenToNode();
-    tree.root.traverseNodeChildren(0);
+    try tree.loadTreeFromDir();
+    tree.traverseTree();
 }
 
 test "check if value can be found in tree" {
@@ -39,7 +38,7 @@ test "check if value can be found in tree" {
     var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
-    try tree.root.addChildrenToNode();
+    try tree.loadTreeFromDir();
     const result = tree.root.findMatchingNodeByName("install.txt");
     try std.testing.expect(result);
 }
@@ -51,7 +50,7 @@ test "check if value cannot be found in tree" {
     var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
-    try tree.root.addChildrenToNode();
+    try tree.loadTreeFromDir();
     const result = tree.root.findMatchingNodeByName("aha.txt");
     try std.testing.expect(!result);
 }
