@@ -9,7 +9,7 @@ pub const Node = struct {
     allocator: std.mem.Allocator,
     parent: ?*const Node,
 
-    const SearchError = error{
+    pub const SearchError = error{
         NotFound,
     };
 
@@ -57,8 +57,7 @@ pub const Node = struct {
             switch (entry.kind) {
                 std.fs.File.Kind.directory => {
                     const entry_dir = try root_dir.openDir(entry.name, .{ .iterate = true });
-                    const allocated_file_name = try self.allocator.alloc(u8, entry.name.len);
-                    std.mem.copyForwards(u8, allocated_file_name, entry.name);
+                    const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
 
                     const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .dir = entry_dir });
                     const node = Node.init(self.allocator, self, file_struct);
@@ -67,8 +66,7 @@ pub const Node = struct {
                 },
                 std.fs.File.Kind.file => {
                     const entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_write });
-                    const allocated_file_name = try self.allocator.alloc(u8, entry.name.len);
-                    std.mem.copyForwards(u8, allocated_file_name, entry.name);
+                    const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
 
                     const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .file = entry_file });
                     try self.children.append(Node.init(self.allocator, self, file_struct));
@@ -80,16 +78,16 @@ pub const Node = struct {
 
     pub fn findMatchingNodeByName(self: *const Node, arraylist: *std.ArrayList([]u8), name: []const u8) ![]const u8 {
         if (std.mem.eql(u8, self.value.name, name)) {
-            return getNodePathFromParent(self, arraylist);
+            return self.getNodePathFromParent(arraylist);
         }
         for (self.children.items) |child| {
             switch (child.value.file_union) {
                 .dir => {
-                    return findMatchingNodeByName(&child, arraylist, name);
+                    return child.findMatchingNodeByName(arraylist, name);
                 },
                 .file => {
                     if (std.mem.eql(u8, child.value.name, name)) {
-                        return getNodePathFromParent(&child, arraylist);
+                        return child.getNodePathFromParent(arraylist);
                     }
                 },
             }
@@ -98,21 +96,20 @@ pub const Node = struct {
     }
 
     fn getNodePathFromParent(self: ?*const Node, arraylist: *std.ArrayList([]u8)) ![]const u8 {
+        try arraylist.insert(0, self.?.value.name);
         if (self.?.parent) |parent| {
-            try arraylist.append(self.?.value.name);
-            return getNodePathFromParent(parent, arraylist);
+            return parent.getNodePathFromParent(arraylist);
         }
-        const testing = try joinArraylistToPath(self.?.allocator, arraylist);
-        return testing;
+        return try joinArraylistToPath(self.?.allocator, arraylist);
     }
 
     fn joinArraylistToPath(allocator: std.mem.Allocator, arraylist: *std.ArrayList([]u8)) ![]const u8 {
         var ring_buffer = try std.RingBuffer.init(allocator, MAX_PATH);
         defer ring_buffer.deinit(allocator);
 
-        while (arraylist.items.len > 0) {
-            try ring_buffer.writeSlice(arraylist.pop());
-            if (arraylist.items.len > 0) {
+        for (arraylist.items, 0..) |item, index| {
+            try ring_buffer.writeSlice(item);
+            if (index < arraylist.items.len - 1) {
                 try ring_buffer.writeSlice("/");
             }
         }

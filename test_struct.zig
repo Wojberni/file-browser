@@ -33,6 +33,25 @@ pub const TestFileStructure = struct {
         };
     }
 
+    pub fn getRandomFilePath(self: *TestFileStructure) ![]u8 {
+        const rand = std.crypto.random;
+        const random_index = rand.intRangeAtMost(usize, 0, self.file_paths.items.len - 1);
+        if (!std.mem.eql(u8, self.test_dir_name, ".")) {
+            return try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ self.test_dir_name, self.file_paths.items[random_index] });
+        }
+        return try std.fmt.allocPrint(self.allocator, "{s}", .{self.file_paths.items[random_index]});
+    }
+
+    pub fn getFilenameFromFilePath(file_path: []const u8) []const u8 {
+        var path_items_iterator = std.mem.splitSequence(u8, file_path, "/");
+        while (path_items_iterator.next()) |path_item| {
+            if (!std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
+                return path_item;
+            }
+        }
+        return "";
+    }
+
     fn initFilePaths(self: *TestFileStructure) !void {
         var file_list = std.ArrayList([]const u8).init(self.allocator);
         errdefer file_list.deinit();
@@ -50,13 +69,16 @@ pub const TestFileStructure = struct {
         self.root_dir = try std.fs.cwd().openDir(".", .{});
         errdefer self.root_dir.close();
 
-        self.root_dir.makeDir(self.test_dir_name) catch |err| {
-            std.debug.print("Failed to create test directory '{s}': {}\n", .{ self.test_dir_name, err });
-            return err;
-        };
-
-        self.test_dir = try self.root_dir.openDir(self.test_dir_name, .{});
-        errdefer self.test_dir.close();
+        if (!std.mem.eql(u8, self.test_dir_name, ".")) {
+            self.root_dir.makeDir(self.test_dir_name) catch |err| {
+                std.debug.print("Failed to create test directory '{s}': {}\n", .{ self.test_dir_name, err });
+                return err;
+            };
+            self.test_dir = try self.root_dir.openDir(self.test_dir_name, .{});
+            errdefer self.test_dir.close();
+        } else {
+            self.test_dir = self.root_dir;
+        }
     }
 
     fn createTestFileStructure(self: *TestFileStructure) !void {
@@ -80,8 +102,7 @@ pub const TestFileStructure = struct {
                 try ring_buffer.writeSlice(path_item);
                 try ring_buffer.writeSlice("/");
             } else {
-                full_item_name = try self.allocator.realloc(full_item_name, path_item.len);
-                std.mem.copyForwards(u8, full_item_name, path_item);
+                full_item_name = try std.fmt.allocPrint(self.allocator, "{s}", .{path_item});
             }
         }
 
