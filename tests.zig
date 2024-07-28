@@ -39,8 +39,8 @@ test "check if value can be found in tree" {
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
-    const result = tree.root.findMatchingNodeByName("install.txt");
-    try std.testing.expect(result);
+    const result = try tree.findMatchingNodeByName("install.txt");
+    try std.testing.expect(std.mem.eql(u8, result, "found"));
 }
 
 test "check if value cannot be found in tree" {
@@ -51,6 +51,6 @@ test "check if value cannot be found in tree" {
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
-    const result = tree.root.findMatchingNodeByName("aha.txt");
-    try std.testing.expect(!result);
+    const result = tree.findMatchingNodeByName("aha.txt");
+    try std.testing.expect(result == Tree.Tree.NodeNotFound);
 }

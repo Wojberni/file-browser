@@ -5,12 +5,17 @@ pub const Node = struct {
     value: FileStruct.FileStruct,
     children: std.ArrayList(Node),
     allocator: std.mem.Allocator,
+    parent: ?*const Node,
 
-    pub fn init(allocator: std.mem.Allocator, value: FileStruct.FileStruct) Node {
+    pub const SearchError = error{
+        NotFound,
+    };
+
+    pub fn init(allocator: std.mem.Allocator, parent: ?*const Node, value: FileStruct.FileStruct) Node {
         var children = std.ArrayList(Node).init(allocator);
         errdefer children.deinit();
 
-        return Node{ .value = value, .children = children, .allocator = allocator };
+        return Node{ .value = value, .children = children, .allocator = allocator, .parent = parent };
     }
 
     pub fn deinit(self: *const Node) void {
@@ -54,9 +59,9 @@ pub const Node = struct {
                     std.mem.copyForwards(u8, allocated_file_name, entry.name);
 
                     const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .dir = entry_dir });
-                    var node = Node.init(self.allocator, file_struct);
-                    try node.addChildrenToNode();
+                    const node = Node.init(self.allocator, self, file_struct);
                     try self.children.append(node);
+                    try self.children.items[self.children.items.len - 1].addChildrenToNode();
                 },
                 std.fs.File.Kind.file => {
                     const entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_write });
@@ -64,16 +69,16 @@ pub const Node = struct {
                     std.mem.copyForwards(u8, allocated_file_name, entry.name);
 
                     const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .file = entry_file });
-                    try self.children.append(Node.init(self.allocator, file_struct));
+                    try self.children.append(Node.init(self.allocator, self, file_struct));
                 },
                 else => unreachable,
             }
         }
     }
 
-    pub fn findMatchingNodeByName(self: *const Node, name: []const u8) bool {
+    pub fn findMatchingNodeByName(self: *const Node, name: []const u8) SearchError![]const u8 {
         if (std.mem.eql(u8, self.value.name, name)) {
-            return true;
+            return getNodePathFromParent(self);
         }
         for (self.children.items) |child| {
             switch (child.value.file_union) {
@@ -82,12 +87,20 @@ pub const Node = struct {
                 },
                 .file => {
                     if (std.mem.eql(u8, child.value.name, name)) {
-                        return true;
+                        return getNodePathFromParent(&child);
                     }
                 },
             }
         }
-        return false;
+        return SearchError.NotFound;
+    }
+
+    fn getNodePathFromParent(self: ?*const Node) []const u8 {
+        if (self.?.parent) |parent| {
+            return getNodePathFromParent(parent);
+        }
+        // TODO: return full path instead of placeholder name
+        return "found";
     }
 
     pub fn traverseNodeChildren(self: *const Node, nested_level: u32) void {
@@ -110,12 +123,3 @@ pub const Node = struct {
         }
     }
 };
-
-// const SearchError = error{
-//     NotFound,
-// };
-
-// TODO: to implement after refactor
-// pub fn findMatchingNodeByName(self: *const Node, name: []const u8) SearchError![]const u8 {
-
-// }

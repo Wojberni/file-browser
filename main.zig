@@ -15,6 +15,6 @@ pub fn main() !void {
     try tree.loadTreeFromDir();
     tree.traverseTree();
 
-    std.debug.print("Found: '{s}': {}\n", .{ "thing", tree.root.findMatchingNodeByName("thing") });
-    std.debug.print("Found: '{s}': {}\n", .{ "aha.txt", tree.root.findMatchingNodeByName("aha.txt") });
+    std.debug.print("Find: '{s}': {s}\n", .{ "thing", try tree.findMatchingNodeByName("thing") });
+    std.debug.print("Find: '{s}': {any}\n", .{ "aha.txt", tree.findMatchingNodeByName("aha.txt") });
 }
