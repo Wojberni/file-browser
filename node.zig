@@ -1,13 +1,15 @@
 const std = @import("std");
 const FileStruct = @import("file_struct.zig");
 
+const MAX_PATH = std.os.linux.PATH_MAX;
+
 pub const Node = struct {
     value: FileStruct.FileStruct,
     children: std.ArrayList(Node),
     allocator: std.mem.Allocator,
     parent: ?*const Node,
 
-    pub const SearchError = error{
+    const SearchError = error{
         NotFound,
     };
 
@@ -76,18 +78,18 @@ pub const Node = struct {
         }
     }
 
-    pub fn findMatchingNodeByName(self: *const Node, name: []const u8) SearchError![]const u8 {
+    pub fn findMatchingNodeByName(self: *const Node, arraylist: *std.ArrayList([]u8), name: []const u8) ![]const u8 {
         if (std.mem.eql(u8, self.value.name, name)) {
-            return getNodePathFromParent(self);
+            return getNodePathFromParent(self, arraylist);
         }
         for (self.children.items) |child| {
             switch (child.value.file_union) {
                 .dir => {
-                    return findMatchingNodeByName(&child, name);
+                    return findMatchingNodeByName(&child, arraylist, name);
                 },
                 .file => {
                     if (std.mem.eql(u8, child.value.name, name)) {
-                        return getNodePathFromParent(&child);
+                        return getNodePathFromParent(&child, arraylist);
                     }
                 },
             }
@@ -95,12 +97,28 @@ pub const Node = struct {
         return SearchError.NotFound;
     }
 
-    fn getNodePathFromParent(self: ?*const Node) []const u8 {
+    fn getNodePathFromParent(self: ?*const Node, arraylist: *std.ArrayList([]u8)) ![]const u8 {
         if (self.?.parent) |parent| {
-            return getNodePathFromParent(parent);
+            try arraylist.append(self.?.value.name);
+            return getNodePathFromParent(parent, arraylist);
         }
-        // TODO: return full path instead of placeholder name
-        return "found";
+        const testing = try joinArraylistToPath(self.?.allocator, arraylist);
+        return testing;
+    }
+
+    fn joinArraylistToPath(allocator: std.mem.Allocator, arraylist: *std.ArrayList([]u8)) ![]const u8 {
+        var ring_buffer = try std.RingBuffer.init(allocator, MAX_PATH);
+        defer ring_buffer.deinit(allocator);
+
+        while (arraylist.items.len > 0) {
+            try ring_buffer.writeSlice(arraylist.pop());
+            if (arraylist.items.len > 0) {
+                try ring_buffer.writeSlice("/");
+            }
+        }
+        const path = try allocator.alloc(u8, ring_buffer.write_index);
+        try ring_buffer.readFirst(path, ring_buffer.write_index);
+        return path;
     }
 
     pub fn traverseNodeChildren(self: *const Node, nested_level: u32) void {
