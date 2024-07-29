@@ -36,12 +36,12 @@ pub const Tree = struct {
         return try self.root.findMatchingNodeByName(&arraylist, name);
     }
 
-    // pub fn insertNodeWithPath(self: *Tree, path: []const u8) !void {
-    //     var path_items_iterator = std.mem.splitSequence(u8, path, "/");
-    //     var node_item = self.root;
-    //     while (path_items_iterator.next()) |item| {
-    //         node_item = node_item.addChild(item);
-    //     }
+    pub fn insertNodeWithPath(self: *Tree, path: []const u8) !void {
+        var path_items_iterator = std.mem.splitSequence(u8, path, "/");
+        var node_item = self.root;
+        while (path_items_iterator.next()) |item| {
+            node_item = node_item.addChild(item);
+        }
         
-    // }
+    }
 };

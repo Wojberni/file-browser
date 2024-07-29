@@ -1,5 +1,5 @@
 const std = @import("std");
-const FileStruct = @import("file_struct.zig");
+const FileUtils = @import("file_utils.zig");
 
 pub const TestFileStructure = struct {
     file_paths: std.ArrayList([]const u8),
@@ -41,7 +41,7 @@ pub const TestFileStructure = struct {
     }
 
     pub fn getLastNameFromPath(path: []const u8) []const u8 {
-        var path_items_iterator = std.mem.splitSequence(u8, path, "/");
+        var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
         while (path_items_iterator.next()) |path_item| {
             if (path_items_iterator.peek() == null) {
                 return path_item;
@@ -56,9 +56,11 @@ pub const TestFileStructure = struct {
 
         try file_list.append("something.txt");
         try file_list.append("some/thing.txt");
+        try file_list.append("some/thing/funny.txt");
+        try file_list.append("some/thing");
         try file_list.append("some/thing/to/install.txt");
         try file_list.append("some/thing/to/do.txt");
-        try file_list.append("some/thing/funny.txt");
+        try file_list.append("some/thing/to");
 
         self.file_paths = file_list;
     }
@@ -80,7 +82,7 @@ pub const TestFileStructure = struct {
 
     fn createTestFileStructure(self: *TestFileStructure) !void {
         for (self.file_paths.items) |entry| {
-            try FileStruct.createPathAndFile(self.allocator, self.test_dir, entry);
+            try FileUtils.createPathAndFile(self.allocator, self.test_dir, entry);
         }
     }
 };
