@@ -1,6 +1,5 @@
 const std = @import("std");
-
-const MAX_PATH = std.os.linux.PATH_MAX;
+const FileStruct = @import("file_struct.zig");
 
 pub const TestFileStructure = struct {
     file_paths: std.ArrayList([]const u8),
@@ -8,6 +7,8 @@ pub const TestFileStructure = struct {
     test_dir: std.fs.Dir,
     test_dir_name: []const u8,
     allocator: std.mem.Allocator,
+
+    const InitTestDirError = error{CannotBeCurrentDir};
 
     pub fn init(allocator: std.mem.Allocator, test_dir_name: []const u8) !TestFileStructure {
         var test_file_structure = TestFileStructure{
@@ -39,10 +40,10 @@ pub const TestFileStructure = struct {
         return self.file_paths.items[random_index];
     }
 
-    pub fn getFilenameFromFilePath(file_path: []const u8) []const u8 {
-        var path_items_iterator = std.mem.splitSequence(u8, file_path, "/");
+    pub fn getLastNameFromPath(path: []const u8) []const u8 {
+        var path_items_iterator = std.mem.splitSequence(u8, path, "/");
         while (path_items_iterator.next()) |path_item| {
-            if (!std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
+            if (path_items_iterator.peek() == null) {
                 return path_item;
             }
         }
@@ -63,59 +64,23 @@ pub const TestFileStructure = struct {
     }
 
     fn initTestDir(self: *TestFileStructure) !void {
+        if (std.mem.eql(u8, self.test_dir_name, ".")) {
+            return InitTestDirError.CannotBeCurrentDir;
+        }
+
         self.root_dir = try std.fs.cwd().openDir(".", .{});
         errdefer self.root_dir.close();
-
-        if (!std.mem.eql(u8, self.test_dir_name, ".")) {
-            self.root_dir.makeDir(self.test_dir_name) catch |err| {
-                std.debug.print("Failed to create test directory '{s}': {}\n", .{ self.test_dir_name, err });
-                return err;
-            };
-            self.test_dir = try self.root_dir.openDir(self.test_dir_name, .{});
-            errdefer self.test_dir.close();
-        } else {
-            self.test_dir = self.root_dir;
-        }
+        self.root_dir.makeDir(self.test_dir_name) catch |err| {
+            std.debug.print("Failed to create test directory '{s}': {}\n", .{ self.test_dir_name, err });
+            return err;
+        };
+        self.test_dir = try self.root_dir.openDir(self.test_dir_name, .{});
+        errdefer self.test_dir.close();
     }
 
     fn createTestFileStructure(self: *TestFileStructure) !void {
         for (self.file_paths.items) |entry| {
-            try createPathAndFile(self, entry);
-        }
-    }
-
-    fn createPathAndFile(self: *TestFileStructure, entry: []const u8) !void {
-        var full_item_path: []u8 = try self.allocator.alloc(u8, 0);
-        defer self.allocator.free(full_item_path);
-        var full_item_name: []u8 = try self.allocator.alloc(u8, 0);
-        defer self.allocator.free(full_item_name);
-
-        var ring_buffer = try std.RingBuffer.init(self.allocator, MAX_PATH);
-        defer ring_buffer.deinit(self.allocator);
-
-        var path_items_iterator = std.mem.splitSequence(u8, entry, "/");
-        while (path_items_iterator.next()) |path_item| {
-            if (std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
-                try ring_buffer.writeSlice(path_item);
-                try ring_buffer.writeSlice("/");
-            } else {
-                full_item_name = try std.fmt.allocPrint(self.allocator, "{s}", .{path_item});
-            }
-        }
-
-        if (ring_buffer.write_index > 0) {
-            full_item_path = try self.allocator.realloc(full_item_path, ring_buffer.write_index);
-            try ring_buffer.readFirst(full_item_path, ring_buffer.write_index);
-        }
-
-        if (!std.mem.eql(u8, full_item_path, "")) {
-            var file_path = try self.test_dir.makeOpenPath(full_item_path, .{});
-            defer file_path.close();
-            var file = try file_path.createFile(full_item_name, .{});
-            defer file.close();
-        } else {
-            var file = try self.test_dir.createFile(full_item_name, .{});
-            defer file.close();
+            try FileStruct.createPathAndFile(self.allocator, self.test_dir, entry);
         }
     }
 };

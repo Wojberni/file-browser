@@ -75,9 +75,9 @@ pub const Node = struct {
             }
         }
     }
-    
+
     // pub fn addChild(self: *Node, name: []u8) !*Node {
-        
+
     // }
 
     pub fn findMatchingNodeByName(self: *const Node, arraylist: *std.ArrayList([]u8), name: []const u8) ![]const u8 {

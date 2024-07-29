@@ -16,7 +16,7 @@ pub fn main() !void {
     tree.traverseTree();
 
     const random_file_path = test_file_structure.getRandomFilePath();
-    const random_file_name = TestStruct.TestFileStructure.getFilenameFromFilePath(random_file_path);
+    const random_file_name = TestStruct.TestFileStructure.getLastNameFromPath(random_file_path);
 
     const found_item = try tree.findMatchingNodeByName(random_file_name);
     defer allocator.free(found_item);

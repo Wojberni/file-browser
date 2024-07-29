@@ -41,7 +41,7 @@ test "check if value can be found in tree" {
 
     try tree.loadTreeFromDir();
     const random_file_path = test_file_structure.getRandomFilePath();
-    const random_file_name = TestStruct.TestFileStructure.getFilenameFromFilePath(random_file_path);
+    const random_file_name = TestStruct.TestFileStructure.getLastNameFromPath(random_file_path);
 
     const result = try tree.findMatchingNodeByName(random_file_name);
     defer ALLOCATOR.free(result);
