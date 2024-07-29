@@ -15,11 +15,12 @@ pub fn main() !void {
     try tree.loadTreeFromDir();
     tree.traverseTree();
 
-    const random_file_path = try test_file_structure.getRandomFilePath();
-    defer allocator.free(random_file_path);
+    const random_file_path = test_file_structure.getRandomFilePath();
     const random_file_name = TestStruct.TestFileStructure.getFilenameFromFilePath(random_file_path);
+
     const found_item = try tree.findMatchingNodeByName(random_file_name);
     defer allocator.free(found_item);
+
     const not_found_name = "aha.txt";
     const not_found_item = tree.findMatchingNodeByName(not_found_name);
 

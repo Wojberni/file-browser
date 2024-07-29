@@ -33,13 +33,10 @@ pub const TestFileStructure = struct {
         };
     }
 
-    pub fn getRandomFilePath(self: *TestFileStructure) ![]u8 {
+    pub fn getRandomFilePath(self: *TestFileStructure) []const u8 {
         const rand = std.crypto.random;
         const random_index = rand.intRangeAtMost(usize, 0, self.file_paths.items.len - 1);
-        if (!std.mem.eql(u8, self.test_dir_name, ".")) {
-            return try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ self.test_dir_name, self.file_paths.items[random_index] });
-        }
-        return try std.fmt.allocPrint(self.allocator, "{s}", .{self.file_paths.items[random_index]});
+        return self.file_paths.items[random_index];
     }
 
     pub fn getFilenameFromFilePath(file_path: []const u8) []const u8 {
