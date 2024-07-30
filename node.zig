@@ -77,12 +77,37 @@ pub const Node = struct {
         }
     }
 
-    pub fn addChild(self: *Node, name: []u8) !*Node {
+    pub fn insertNodeWithPath(self: *Node, name: []const u8) !void {
+        try FileUtils.createPathAndFile(self.allocator, self.value.file_union.dir, name);
+        var path_items_iterator = std.mem.tokenizeSequence(u8, name, "/");
+        var node_iter = self;
+        while (path_items_iterator.next()) |path_item| {
+            if (node_iter.checkIfChildExists(path_item)) |node| {
+                node_iter = node;
+                continue;
+            }
+            const allocated_name = try std.fmt.allocPrint(self.allocator, "{s}", .{path_item});
+            var file_struct: FileStruct.FileStruct = undefined;
+            if (std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
+                const dir = try node_iter.value.file_union.dir.openDir(path_item, .{ .iterate = true });
+                file_struct = FileStruct.FileStruct.init(allocated_name, FileStruct.FileStruct.FileUnion{ .dir = dir });
+            } else {
+                const file = try node_iter.value.file_union.dir.openFile(path_item, .{ .mode = std.fs.File.OpenMode.read_write });
+                file_struct = FileStruct.FileStruct.init(allocated_name, FileStruct.FileStruct.FileUnion{ .file = file });
+            }
+            const node = Node.init(self.allocator, node_iter, file_struct);
+            try node_iter.children.append(node);
+            node_iter = &node_iter.children.items[node_iter.children.items.len - 1];
+        }
+    }
+
+    fn checkIfChildExists(self: *Node, name: []const u8) ?*Node {
         for (self.children.items) |*item| {
             if (std.mem.eql(u8, name, item.value.name)) {
                 return item;
             }
         }
+        return null;
     }
 
     pub fn findMatchingNodeByName(self: *Node, name: []const u8) ![]const u8 {

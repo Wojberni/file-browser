@@ -40,16 +40,6 @@ pub const TestFileStructure = struct {
         return self.file_paths.items[random_index];
     }
 
-    pub fn getLastNameFromPath(path: []const u8) []const u8 {
-        var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
-        while (path_items_iterator.next()) |path_item| {
-            if (path_items_iterator.peek() == null) {
-                return path_item;
-            }
-        }
-        return "";
-    }
-
     fn initFilePaths(self: *TestFileStructure) !void {
         var file_list = std.ArrayList([]const u8).init(self.allocator);
         errdefer file_list.deinit();

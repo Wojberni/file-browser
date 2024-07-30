@@ -11,7 +11,7 @@ pub fn createPathAndFile(allocator: std.mem.Allocator, root_dir: std.fs.Dir, ent
     var ring_buffer = try std.RingBuffer.init(allocator, MAX_PATH);
     defer ring_buffer.deinit(allocator);
 
-    var path_items_iterator = std.mem.splitSequence(u8, entry, "/");
+    var path_items_iterator = std.mem.tokenizeSequence(u8, entry, "/");
     while (path_items_iterator.next()) |path_item| {
         if (std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
             try ring_buffer.writeSlice(path_item);
@@ -52,4 +52,14 @@ pub fn joinArraylistToPath(allocator: std.mem.Allocator, arraylist: *std.ArrayLi
     const path = try allocator.alloc(u8, ring_buffer.write_index);
     try ring_buffer.readFirst(path, ring_buffer.write_index);
     return path;
+}
+
+pub fn getLastNameFromPath(path: []const u8) []const u8 {
+    var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
+    while (path_items_iterator.next()) |path_item| {
+        if (path_items_iterator.peek() == null) {
+            return path_item;
+        }
+    }
+    return "";
 }

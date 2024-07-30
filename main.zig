@@ -2,6 +2,7 @@ const std = @import("std");
 const Tree = @import("tree.zig");
 const TestStruct = @import("test_struct.zig");
 const Tests = @import("tests.zig");
+const FileUtils = @import("file_utils.zig");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -13,11 +14,8 @@ pub fn main() !void {
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
-    tree.traverseTree();
 
-    const random_file_path = test_file_structure.getRandomFilePath();
-    const random_file_name = TestStruct.TestFileStructure.getLastNameFromPath(random_file_path);
-
+    const random_file_name = FileUtils.getLastNameFromPath(test_file_structure.getRandomFilePath());
     const found_item = try tree.findMatchingNodeByName(random_file_name);
     defer allocator.free(found_item);
 
@@ -26,4 +24,9 @@ pub fn main() !void {
 
     std.debug.print("Find: '{s}': {s}\n", .{ random_file_name, found_item });
     std.debug.print("Find: '{s}': {any}\n", .{ not_found_name, not_found_item });
+
+    const node_path = "insert/node/name.txt";
+    try tree.insertNodeWithPath(node_path);
+
+    tree.traverseTree();
 }
