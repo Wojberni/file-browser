@@ -31,9 +31,7 @@ pub const Tree = struct {
     }
 
     pub fn findMatchingNodeByName(self: *Tree, name: []const u8) ![]const u8 {
-        var arraylist = std.ArrayList([]u8).init(self.root.allocator);
-        defer arraylist.deinit();
-        return try self.root.findMatchingNodeByName(&arraylist, name);
+        return try self.root.findMatchingNodeByName(name);
     }
 
     pub fn insertNodeWithPath(self: *Tree, path: []const u8) !void {

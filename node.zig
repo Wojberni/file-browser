@@ -85,31 +85,33 @@ pub const Node = struct {
         }
     }
 
-    pub fn findMatchingNodeByName(self: *Node, arraylist: *std.ArrayList([]u8), name: []const u8) ![]const u8 {
+    pub fn findMatchingNodeByName(self: *Node, name: []const u8) ![]const u8 {
         var queue = std.ArrayList(*Node).init(self.allocator);
         defer queue.deinit();
-
-        try queue.append(self);
+        try queue.insert(0, self);
 
         while (queue.items.len > 0) {
             const current_node = queue.pop();
             if (std.mem.eql(u8, current_node.value.name, name)) {
-                return current_node.getNodePathFromRoot(arraylist);
+                return current_node.getNodePathFromRoot();
             }
             for (current_node.children.items) |*child| {
-                try queue.append(child);
+                try queue.insert(0, child);
             }
         }
-
         return SearchError.NotFound;
     }
 
-    fn getNodePathFromRoot(self: ?*const Node, arraylist: *std.ArrayList([]u8)) ![]const u8 {
-        try arraylist.insert(0, self.?.value.name);
-        if (self.?.parent) |parent| {
-            return parent.getNodePathFromRoot(arraylist);
+    fn getNodePathFromRoot(self: ?*const Node) ![]const u8 {
+        var queue = std.ArrayList([]u8).init(self.?.allocator);
+        defer queue.deinit();
+
+        var iterator = self;
+        while (iterator != null) : (iterator = iterator.?.parent) {
+            try queue.insert(0, iterator.?.value.name);
         }
-        return try FileUtils.joinArraylistToPath(self.?.allocator, arraylist);
+        const result = try FileUtils.joinArraylistToPath(self.?.allocator, &queue);
+        return result;
     }
 
     pub fn traverseNodeChildren(self: *const Node, nested_level: u32) void {
