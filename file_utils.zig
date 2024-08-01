@@ -39,6 +39,14 @@ pub fn createPathAndFile(allocator: std.mem.Allocator, root_dir: std.fs.Dir, ent
     }
 }
 
+pub fn deleteDirOrFileFromDir(root_dir: std.fs.Dir, entry: []const u8) !void {
+    if (std.mem.eql(u8, std.fs.path.extension(entry), "")) {
+        try root_dir.deleteTree(entry);
+    } else {
+        try root_dir.deleteFile(entry);
+    }
+}
+
 pub fn joinArraylistToPath(allocator: std.mem.Allocator, arraylist: *std.ArrayList([]u8)) ![]const u8 {
     var ring_buffer = try std.RingBuffer.init(allocator, MAX_PATH);
     defer ring_buffer.deinit(allocator);

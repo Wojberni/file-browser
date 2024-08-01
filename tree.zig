@@ -27,7 +27,7 @@ pub const Tree = struct {
     }
 
     pub fn loadTreeFromDir(self: *Tree) !void {
-        try self.root.addChildrenToNode();
+        try self.root.loadNodeChildren();
     }
 
     pub fn findMatchingNodeByName(self: *Tree, name: []const u8) ![]const u8 {
@@ -36,5 +36,9 @@ pub const Tree = struct {
 
     pub fn insertNodeWithPath(self: *Tree, path: []const u8) !void {
         try self.root.insertNodeWithPath(path);
+    }
+    
+    pub fn deleteNodeWithPath(self: *Tree, path: []const u8) !void {
+        try self.root.deleteNodeWithPath(path);
     }
 };

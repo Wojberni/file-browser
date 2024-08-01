@@ -49,23 +49,29 @@ pub const Node = struct {
         self.children.deinit();
     }
 
-    pub fn addChildrenToNode(self: *Node) !void {
+    pub fn loadNodeChildren(self: *Node) !void {
         const root_dir = self.value.file_union.dir;
 
         var iterator = root_dir.iterate();
-
         while (try iterator.next()) |entry| {
             switch (entry.kind) {
                 std.fs.File.Kind.directory => {
+                    if (self.checkIfChildExists(entry.name)) |node| {
+                        try node.loadNodeChildren();
+                        continue;
+                    }
                     const entry_dir = try root_dir.openDir(entry.name, .{ .iterate = true });
                     const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
 
                     const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .dir = entry_dir });
                     const node = Node.init(self.allocator, self, file_struct);
                     try self.children.append(node);
-                    try self.children.items[self.children.items.len - 1].addChildrenToNode();
+                    try self.children.items[self.children.items.len - 1].loadNodeChildren();
                 },
                 std.fs.File.Kind.file => {
+                    if (self.checkIfChildExists(entry.name)) |_| {
+                        continue;
+                    }
                     const entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_write });
                     const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
 
@@ -77,9 +83,9 @@ pub const Node = struct {
         }
     }
 
-    pub fn insertNodeWithPath(self: *Node, name: []const u8) !void {
-        try FileUtils.createPathAndFile(self.allocator, self.value.file_union.dir, name);
-        var path_items_iterator = std.mem.tokenizeSequence(u8, name, "/");
+    pub fn insertNodeWithPath(self: *Node, path: []const u8) !void {
+        try FileUtils.createPathAndFile(self.allocator, self.value.file_union.dir, path);
+        var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
         var node_iter = self;
         while (path_items_iterator.next()) |path_item| {
             if (node_iter.checkIfChildExists(path_item)) |node| {
@@ -101,13 +107,42 @@ pub const Node = struct {
         }
     }
 
-    fn checkIfChildExists(self: *Node, name: []const u8) ?*Node {
+    pub fn deleteNodeWithPath(self: *Node, path: []const u8) !void {
+        var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
+        var node_iter = self;
+        while (path_items_iterator.next()) |path_item| {
+            if (node_iter.checkIfChildExists(path_item)) |node| {
+                node_iter = node;
+            } else {
+                return SearchError.NotFound;
+            }
+        }
+        const parent = node_iter.parent.?;
+        var parent_children = node_iter.parent.?.children;
+        const parent_dir = node_iter.parent.?.value.file_union.dir;
+        const last_name = FileUtils.getLastNameFromPath(path);
+        try FileUtils.deleteDirOrFileFromDir(parent_dir, last_name);
+        const index = try getChildIndex(parent, last_name);
+        const found_node = parent_children.orderedRemove(index);
+        found_node.deinit();
+    }
+
+    fn checkIfChildExists(self: *const Node, name: []const u8) ?*Node {
         for (self.children.items) |*item| {
             if (std.mem.eql(u8, name, item.value.name)) {
                 return item;
             }
         }
         return null;
+    }
+
+    fn getChildIndex(self: *const Node, name: []const u8) !usize {
+        for (self.children.items, 0..) |*item, index| {
+            if (std.mem.eql(u8, name, item.value.name)) {
+                return index;
+            }
+        }
+        return SearchError.NotFound;
     }
 
     pub fn findMatchingNodeByName(self: *Node, name: []const u8) ![]const u8 {

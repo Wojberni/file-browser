@@ -29,4 +29,7 @@ pub fn main() !void {
     try tree.insertNodeWithPath(node_path);
 
     tree.traverseTree();
+
+    // try tree.deleteNodeWithPath(node_path);
+    // tree.traverseTree();
 }
