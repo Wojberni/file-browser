@@ -37,8 +37,8 @@ pub const Tree = struct {
     pub fn insertNodeWithPath(self: *Tree, path: []const u8) !void {
         try self.root.insertNodeWithPath(path);
     }
-    
-    pub fn deleteNodeWithPath(self: *Tree, path: []const u8) !void {
-        try self.root.deleteNodeWithPath(path);
+
+    pub fn deleteNodeWithPath(self: *Tree, path: []const u8) !Node.Node {
+        return try self.root.deleteNodeWithPath(path);
     }
 };

@@ -30,6 +30,6 @@ pub fn main() !void {
 
     tree.traverseTree();
 
-    // try tree.deleteNodeWithPath(node_path);
-    // tree.traverseTree();
+    try tree.deleteNodeWithPath(node_path);
+    tree.traverseTree();
 }

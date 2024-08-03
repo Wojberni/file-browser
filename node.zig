@@ -8,13 +8,13 @@ pub const Node = struct {
     value: FileStruct.FileStruct,
     children: std.ArrayList(Node),
     allocator: std.mem.Allocator,
-    parent: ?*const Node,
+    parent: ?*Node,
 
     pub const SearchError = error{
         NotFound,
     };
 
-    pub fn init(allocator: std.mem.Allocator, parent: ?*const Node, value: FileStruct.FileStruct) Node {
+    pub fn init(allocator: std.mem.Allocator, parent: ?*Node, value: FileStruct.FileStruct) Node {
         var children = std.ArrayList(Node).init(allocator);
         errdefer children.deinit();
 
@@ -107,7 +107,7 @@ pub const Node = struct {
         }
     }
 
-    pub fn deleteNodeWithPath(self: *Node, path: []const u8) !void {
+    pub fn deleteNodeWithPath(self: *Node, path: []const u8) !Node {
         var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
         var node_iter = self;
         while (path_items_iterator.next()) |path_item| {
@@ -118,13 +118,9 @@ pub const Node = struct {
             }
         }
         const parent = node_iter.parent.?;
-        var parent_children = node_iter.parent.?.children;
-        const parent_dir = node_iter.parent.?.value.file_union.dir;
         const last_name = FileUtils.getLastNameFromPath(path);
-        try FileUtils.deleteDirOrFileFromDir(parent_dir, last_name);
-        const index = try getChildIndex(parent, last_name);
-        const found_node = parent_children.orderedRemove(index);
-        found_node.deinit();
+        try FileUtils.deleteDirOrFileFromDir(parent.value.file_union.dir, last_name);
+        return parent.children.orderedRemove(try getChildIndex(parent, last_name));
     }
 
     fn checkIfChildExists(self: *const Node, name: []const u8) ?*Node {

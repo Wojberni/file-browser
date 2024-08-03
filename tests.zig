@@ -43,12 +43,12 @@ test "check if value can be found in tree" {
     try tree.loadTreeFromDir();
     const random_file_path = test_file_structure.getRandomFilePath();
 
-    const result = try tree.findMatchingNodeByName(FileUtils.getLastNameFromPath(random_file_path));
-    defer ALLOCATOR.free(result);
-    const expectedPath = try std.fmt.allocPrint(ALLOCATOR, "{s}/{s}", .{ test_file_structure.test_dir_name, random_file_path });
-    defer ALLOCATOR.free(expectedPath);
+    const node_path = try tree.findMatchingNodeByName(FileUtils.getLastNameFromPath(random_file_path));
+    defer ALLOCATOR.free(node_path);
+    const expected_path = try std.fmt.allocPrint(ALLOCATOR, "{s}/{s}", .{ test_file_structure.test_dir_name, random_file_path });
+    defer ALLOCATOR.free(expected_path);
 
-    try std.testing.expectEqualStrings(expectedPath, result);
+    try std.testing.expectEqualStrings(expected_path, node_path);
 }
 
 test "check if value cannot be found in tree" {
@@ -60,12 +60,12 @@ test "check if value cannot be found in tree" {
 
     try tree.loadTreeFromDir();
     const not_found_name = "aha.txt";
-    const result = tree.findMatchingNodeByName(not_found_name);
+    const node_path = tree.findMatchingNodeByName(not_found_name);
 
-    try std.testing.expect(result == NODE_NOT_FOUND);
+    try std.testing.expect(node_path == NODE_NOT_FOUND);
 }
 
-test "check if value is inserted into tree and found" {
+test "check if value is inserted into tree and found after" {
     var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
@@ -74,13 +74,44 @@ test "check if value is inserted into tree and found" {
 
     try tree.loadTreeFromDir();
 
-    const node_path = "some/thing/interesting.txt";
-    try tree.insertNodeWithPath(node_path);
+    const inserted_node = "some/thing/interesting.txt";
+    try tree.insertNodeWithPath(inserted_node);
 
-    const result = try tree.findMatchingNodeByName(FileUtils.getLastNameFromPath(node_path));
-    defer ALLOCATOR.free(result);
-    const expectedPath = try std.fmt.allocPrint(ALLOCATOR, "{s}/{s}", .{ test_file_structure.test_dir_name, node_path });
-    defer ALLOCATOR.free(expectedPath);
+    const node_path = try tree.findMatchingNodeByName(FileUtils.getLastNameFromPath(inserted_node));
+    defer ALLOCATOR.free(node_path);
+    const expected_path = try std.fmt.allocPrint(ALLOCATOR, "{s}/{s}", .{ test_file_structure.test_dir_name, inserted_node });
+    defer ALLOCATOR.free(expected_path);
 
-    try std.testing.expectEqualStrings(expectedPath, result);
+    try std.testing.expectEqualStrings(expected_path, node_path);
+}
+
+test "check if value is deleted from tree" {
+    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    defer test_file_structure.deinit();
+
+    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    defer tree.deinit();
+
+    try tree.loadTreeFromDir();
+
+    const random_file_path = test_file_structure.getRandomFilePath();
+    const deleted_node = try tree.deleteNodeWithPath(random_file_path);
+    defer deleted_node.deinit();
+    
+    try std.testing.expectEqualStrings(FileUtils.getLastNameFromPath(random_file_path), deleted_node.value.name);
+}
+
+test "check if value cannot be deleted from tree" {
+    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    defer test_file_structure.deinit();
+
+    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    defer tree.deinit();
+
+    try tree.loadTreeFromDir();
+
+    const not_deleted_node = "not/valid/name.txt";
+    const deleted_node = tree.deleteNodeWithPath(not_deleted_node);
+    
+    try std.testing.expect(deleted_node == NODE_NOT_FOUND);
 }

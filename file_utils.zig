@@ -58,6 +58,7 @@ pub fn joinArraylistToPath(allocator: std.mem.Allocator, arraylist: *std.ArrayLi
         }
     }
     const path = try allocator.alloc(u8, ring_buffer.write_index);
+    errdefer allocator.free(path);
     try ring_buffer.readFirst(path, ring_buffer.write_index);
     return path;
 }
