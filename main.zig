@@ -7,15 +7,12 @@ const FileUtils = @import("file_utils.zig");
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
-    var test_file_structure = try TestStruct.TestFileStructure.init(allocator, Tests.TEST_DIR_NAME);
-    defer test_file_structure.deinit();
-
-    var tree = try Tree.Tree.init(allocator, Tests.TEST_DIR_NAME);
+    var tree = try Tree.Tree.init(allocator, ".");
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
 
-    const random_file_name = FileUtils.getLastNameFromPath(test_file_structure.getRandomFilePath());
+    const random_file_name = "main.zig";
     const found_item = try tree.findMatchingNodeByName(random_file_name);
     defer allocator.free(found_item);
 
@@ -28,8 +25,10 @@ pub fn main() !void {
     const node_path = "insert/node/name.txt";
     try tree.insertNodeWithPath(node_path);
 
-    tree.traverseTree();
+    const deleted_node = try tree.deleteNodeWithPath(FileUtils.getFirstNameFromPath(node_path));
+    deleted_node.traverseNodeChildren(0);
+    deleted_node.deinit();
+    std.debug.print("Inserted and deleted node path: '{s}'\n", .{node_path});
 
-    try tree.deleteNodeWithPath(node_path);
     tree.traverseTree();
 }

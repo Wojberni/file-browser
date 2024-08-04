@@ -72,3 +72,11 @@ pub fn getLastNameFromPath(path: []const u8) []const u8 {
     }
     return "";
 }
+
+pub fn getFirstNameFromPath(path: []const u8) []const u8 {
+    var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
+    if (path_items_iterator.next()) |first_item| {
+        return first_item;
+    }
+    return "";
+}

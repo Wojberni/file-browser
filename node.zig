@@ -18,7 +18,7 @@ pub const Node = struct {
         var children = std.ArrayList(Node).init(allocator);
         errdefer children.deinit();
 
-        return Node{ .value = value, .children = children, .allocator = allocator, .parent = parent };
+        return .{ .value = value, .children = children, .allocator = allocator, .parent = parent };
     }
 
     pub fn deinit(self: *const Node) void {
@@ -33,7 +33,6 @@ pub const Node = struct {
                 node_file.close();
             },
         }
-
         for (self.children.items) |child| {
             switch (child.value.file_union) {
                 .dir => {
@@ -72,7 +71,7 @@ pub const Node = struct {
                     if (self.checkIfChildExists(entry.name)) |_| {
                         continue;
                     }
-                    const entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_write });
+                    const entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_only });
                     const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
 
                     const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .file = entry_file });
@@ -98,7 +97,7 @@ pub const Node = struct {
                 const dir = try node_iter.value.file_union.dir.openDir(path_item, .{ .iterate = true });
                 file_struct = FileStruct.FileStruct.init(allocated_name, FileStruct.FileStruct.FileUnion{ .dir = dir });
             } else {
-                const file = try node_iter.value.file_union.dir.openFile(path_item, .{ .mode = std.fs.File.OpenMode.read_write });
+                const file = try node_iter.value.file_union.dir.openFile(path_item, .{ .mode = std.fs.File.OpenMode.read_only });
                 file_struct = FileStruct.FileStruct.init(allocated_name, FileStruct.FileStruct.FileUnion{ .file = file });
             }
             const node = Node.init(self.allocator, node_iter, file_struct);

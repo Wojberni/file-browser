@@ -12,6 +12,6 @@ pub const FileStruct = struct {
     };
 
     pub fn init(name: []u8, file_union: FileUnion) FileStruct {
-        return FileStruct{ .name = name, .file_union = file_union };
+        return .{ .name = name, .file_union = file_union };
     }
 };

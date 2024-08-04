@@ -15,7 +15,7 @@ pub const Tree = struct {
         std.mem.copyForwards(u8, allocated_file_name, current_dir_name);
 
         const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .dir = current_dir });
-        return Tree{ .root = Node.Node.init(allocator, null, file_struct) };
+        return .{ .root = Node.Node.init(allocator, null, file_struct) };
     }
 
     pub fn deinit(self: *Tree) void {
