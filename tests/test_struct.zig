@@ -1,5 +1,5 @@
 const std = @import("std");
-const FileUtils = @import("file_utils.zig");
+const FileUtils = @import("file-browser").FileUtils;
 
 pub const TestFileStructure = struct {
     file_paths: std.ArrayList([]const u8),

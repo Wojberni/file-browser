@@ -1,8 +1,6 @@
 const std = @import("std");
-const Tree = @import("tree.zig");
-const TestStruct = @import("test_struct.zig");
-const Tests = @import("tests.zig");
-const FileUtils = @import("file_utils.zig");
+const Tree = @import("file-browser").Tree;
+const FileUtils = @import("file-browser").FileUtils;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;

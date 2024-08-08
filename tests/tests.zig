@@ -1,11 +1,11 @@
 const std = @import("std");
-const Tree = @import("tree.zig");
+const Tree = @import("file-browser").Tree;
 const TestStruct = @import("test_struct.zig");
-const FileUtils = @import("file_utils.zig");
+const FileUtils = @import("file-browser").FileUtils;
 
 const ALLOCATOR = std.testing.allocator;
 pub const TEST_DIR_NAME = "testing_dir";
-const NODE_NOT_FOUND = @import("node.zig").Node.SearchError.NotFound;
+const NODE_NOT_FOUND = @import("file-browser").Node.Node.SearchError.NotFound;
 
 test "check if test files are initialized correctly" {
     var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
@@ -97,7 +97,7 @@ test "check if value is deleted from tree" {
     const random_file_path = test_file_structure.getRandomFilePath();
     const deleted_node = try tree.deleteNodeWithPath(random_file_path);
     defer deleted_node.deinit();
-    
+
     try std.testing.expectEqualStrings(FileUtils.getLastNameFromPath(random_file_path), deleted_node.value.name);
 }
 
@@ -112,6 +112,6 @@ test "check if value cannot be deleted from tree" {
 
     const not_deleted_node = "not/valid/name.txt";
     const deleted_node = tree.deleteNodeWithPath(not_deleted_node);
-    
+
     try std.testing.expect(deleted_node == NODE_NOT_FOUND);
 }
