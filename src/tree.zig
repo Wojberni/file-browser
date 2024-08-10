@@ -1,9 +1,9 @@
 const std = @import("std");
-const Node = @import("node.zig");
-const FileStruct = @import("file_struct.zig");
+const Node = @import("node.zig").Node;
+const FileStruct = @import("file_struct.zig").FileStruct;
 
 pub const Tree = struct {
-    root: Node.Node,
+    root: Node,
 
     pub fn init(allocator: std.mem.Allocator, root_dir_name: []const u8) !Tree {
         const current_dir = try std.fs.cwd().openDir(root_dir_name, .{ .iterate = true });
@@ -14,8 +14,8 @@ pub const Tree = struct {
         const allocated_file_name = try allocator.alloc(u8, current_dir_name.len);
         std.mem.copyForwards(u8, allocated_file_name, current_dir_name);
 
-        const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .dir = current_dir });
-        return .{ .root = Node.Node.init(allocator, null, file_struct) };
+        const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .dir = current_dir });
+        return .{ .root = Node.init(allocator, null, file_struct) };
     }
 
     pub fn deinit(self: *Tree) void {
@@ -38,7 +38,7 @@ pub const Tree = struct {
         try self.root.insertNodeWithPath(path);
     }
 
-    pub fn deleteNodeWithPath(self: *Tree, path: []const u8) !Node.Node {
+    pub fn deleteNodeWithPath(self: *Tree, path: []const u8) !Node {
         return try self.root.deleteNodeWithPath(path);
     }
 };

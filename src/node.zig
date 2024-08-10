@@ -1,11 +1,11 @@
 const std = @import("std");
-const FileStruct = @import("file_struct.zig");
+const FileStruct = @import("file_struct.zig").FileStruct;
 const FileUtils = @import("file_utils.zig");
 
 const MAX_PATH = std.os.linux.PATH_MAX;
 
 pub const Node = struct {
-    value: FileStruct.FileStruct,
+    value: FileStruct,
     children: std.ArrayList(Node),
     allocator: std.mem.Allocator,
     parent: ?*Node,
@@ -14,7 +14,7 @@ pub const Node = struct {
         NotFound,
     };
 
-    pub fn init(allocator: std.mem.Allocator, parent: ?*Node, value: FileStruct.FileStruct) Node {
+    pub fn init(allocator: std.mem.Allocator, parent: ?*Node, value: FileStruct) Node {
         var children = std.ArrayList(Node).init(allocator);
         errdefer children.deinit();
 
@@ -62,7 +62,7 @@ pub const Node = struct {
                     const entry_dir = try root_dir.openDir(entry.name, .{ .iterate = true });
                     const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
 
-                    const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .dir = entry_dir });
+                    const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .dir = entry_dir });
                     const node = Node.init(self.allocator, self, file_struct);
                     try self.children.append(node);
                     try self.children.items[self.children.items.len - 1].loadNodeChildren();
@@ -74,7 +74,7 @@ pub const Node = struct {
                     const entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_only });
                     const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
 
-                    const file_struct = FileStruct.FileStruct.init(allocated_file_name, FileStruct.FileStruct.FileUnion{ .file = entry_file });
+                    const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .file = entry_file });
                     try self.children.append(Node.init(self.allocator, self, file_struct));
                 },
                 else => unreachable,
@@ -92,13 +92,13 @@ pub const Node = struct {
                 continue;
             }
             const allocated_name = try std.fmt.allocPrint(self.allocator, "{s}", .{path_item});
-            var file_struct: FileStruct.FileStruct = undefined;
+            var file_struct: FileStruct = undefined;
             if (std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
                 const dir = try node_iter.value.file_union.dir.openDir(path_item, .{ .iterate = true });
-                file_struct = FileStruct.FileStruct.init(allocated_name, FileStruct.FileStruct.FileUnion{ .dir = dir });
+                file_struct = FileStruct.init(allocated_name, FileStruct.FileUnion{ .dir = dir });
             } else {
                 const file = try node_iter.value.file_union.dir.openFile(path_item, .{ .mode = std.fs.File.OpenMode.read_only });
-                file_struct = FileStruct.FileStruct.init(allocated_name, FileStruct.FileStruct.FileUnion{ .file = file });
+                file_struct = FileStruct.init(allocated_name, FileStruct.FileUnion{ .file = file });
             }
             const node = Node.init(self.allocator, node_iter, file_struct);
             try node_iter.children.append(node);

@@ -1,11 +1,11 @@
 const std = @import("std");
-const Tree = @import("file-browser").Tree;
+const Tree = @import("file-browser").Tree.Tree;
 const FileUtils = @import("file-browser").FileUtils;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
-    var tree = try Tree.Tree.init(allocator, ".");
+    var tree = try Tree.init(allocator, ".");
     defer tree.deinit();
 
     try tree.loadTreeFromDir();

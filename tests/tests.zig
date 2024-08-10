@@ -1,6 +1,6 @@
 const std = @import("std");
-const Tree = @import("file-browser").Tree;
-const TestStruct = @import("test_struct.zig");
+const Tree = @import("file-browser").Tree.Tree;
+const TestFileStructure = @import("test_struct.zig").TestFileStructure;
 const FileUtils = @import("file-browser").FileUtils;
 
 const ALLOCATOR = std.testing.allocator;
@@ -8,25 +8,25 @@ pub const TEST_DIR_NAME = "testing_dir";
 const NODE_NOT_FOUND = @import("file-browser").Node.Node.SearchError.NotFound;
 
 test "check if test files are initialized correctly" {
-    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 }
 
 test "check if tree can be initialized" {
-    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
-    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    var tree = try Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
 }
 
 test "check if tree can be traversed" {
-    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
-    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    var tree = try Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
@@ -34,10 +34,10 @@ test "check if tree can be traversed" {
 }
 
 test "check if value can be found in tree" {
-    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
-    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    var tree = try Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
@@ -52,10 +52,10 @@ test "check if value can be found in tree" {
 }
 
 test "check if value cannot be found in tree" {
-    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
-    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    var tree = try Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
@@ -66,10 +66,10 @@ test "check if value cannot be found in tree" {
 }
 
 test "check if value is inserted into tree and found after" {
-    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
-    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    var tree = try Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
@@ -86,10 +86,10 @@ test "check if value is inserted into tree and found after" {
 }
 
 test "check if value is deleted from tree" {
-    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
-    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    var tree = try Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
@@ -102,10 +102,10 @@ test "check if value is deleted from tree" {
 }
 
 test "check if value cannot be deleted from tree" {
-    var test_file_structure = try TestStruct.TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
-    var tree = try Tree.Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    var tree = try Tree.init(ALLOCATOR, TEST_DIR_NAME);
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
