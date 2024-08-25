@@ -1,11 +1,11 @@
 const std = @import("std");
-const Tree = @import("file-browser").Tree.Tree;
+const Tree = @import("file-browser").Tree;
 const TestFileStructure = @import("test_struct.zig").TestFileStructure;
 const FileUtils = @import("file-browser").FileUtils;
 
 const ALLOCATOR = std.testing.allocator;
 pub const TEST_DIR_NAME = "testing_dir";
-const NODE_NOT_FOUND = @import("file-browser").Node.Node.SearchError.NotFound;
+const NODE_NOT_FOUND = @import("file-browser").Node.SearchError.NotFound;
 
 test "check if test files are initialized correctly" {
     var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);

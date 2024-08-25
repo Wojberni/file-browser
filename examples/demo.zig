@@ -1,5 +1,5 @@
 const std = @import("std");
-const Tree = @import("file-browser").Tree.Tree;
+const Tree = @import("file-browser").Tree;
 const FileUtils = @import("file-browser").FileUtils;
 
 pub fn main() !void {

@@ -1,7 +1,7 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
-const Tree = @import("file-browser").Tree.Tree;
-const Node = @import("file-browser").Node.Node;
+const Tree = @import("file-browser").Tree;
+const Node = @import("file-browser").Node;
 
 pub const Event = union(enum) { key_press: vaxis.Key, winsize: vaxis.Winsize };
 
