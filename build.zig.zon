@@ -1,12 +1,18 @@
 .{
     .name = "file-browser",
     .version = "0.0.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .vaxis = .{
+            .url = "https://github.com/rockorager/libvaxis/archive/refs/tags/v0.4.1.tar.gz",
+            .hash = "1220523a3a301cbfbd83a374e2a69073fa14b211f2f6aaa4fc9497c936feaa67f738",
+        },
+    },
 
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "src",
+        "gui",
         "examples",
         "tests",
         "README.md",
