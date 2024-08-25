@@ -1,5 +1,7 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
+const Tree = @import("file-browser").Tree.Tree;
+const Node = @import("file-browser").Node.Node;
 
 pub const Event = union(enum) { key_press: vaxis.Key, winsize: vaxis.Winsize };
 
@@ -8,23 +10,27 @@ pub const MyApp = struct {
     should_quit: bool,
     tty: vaxis.Tty,
     vx: vaxis.Vaxis,
-    current_level: usize,
-    test_max_level: usize,
+    tree: Tree,
+    current_node: *Node,
 
     pub fn init(allocator: std.mem.Allocator) !MyApp {
+        var tree = try Tree.init(allocator, ".");
+        errdefer tree.deinit();
+        try tree.loadTreeFromDir();
         return .{
             .allocator = allocator,
             .should_quit = false,
             .tty = try vaxis.Tty.init(),
             .vx = try vaxis.init(allocator, .{}),
-            .current_level = 0,
-            .test_max_level = 4,
+            .tree = tree,
+            .current_node = &tree.root,
         };
     }
 
     pub fn deinit(self: *MyApp) void {
         self.vx.deinit(self.allocator, self.tty.anyWriter());
         self.tty.deinit();
+        self.tree.deinit();
     }
 
     pub fn run(self: *MyApp) !void {
@@ -33,13 +39,6 @@ pub const MyApp = struct {
 
         try loop.start();
         defer loop.stop();
-
-        const test_list = try createTestList(self.allocator);
-        defer {
-            for (test_list) |item| {
-                item.deinit();
-            }
-        }
 
         try self.vx.enterAltScreen(self.tty.anyWriter());
         try self.vx.queryTerminal(self.tty.anyWriter(), 1 * std.time.ns_per_s);
@@ -56,7 +55,7 @@ pub const MyApp = struct {
             const event = loop.nextEvent();
             try self.update(&table_context, event);
 
-            try self.draw(event_alloc, test_list, &table_context);
+            try self.draw(event_alloc, &table_context);
 
             var buffered = self.tty.bufferedWriter();
             try self.vx.render(buffered.writer().any());
@@ -77,58 +76,33 @@ pub const MyApp = struct {
                     table_context.col -|= 1;
                 if (key.matchesAny(&.{ vaxis.Key.right, 'l' }, .{}))
                     table_context.col +|= 1;
-                if (key.matches(vaxis.Key.enter, .{}) and self.current_level < self.test_max_level - 1)
-                    self.current_level += 1;
+                if (key.matches(vaxis.Key.enter, .{}))
+                    self.current_node = &self.current_node.children.items[0];
                 if (key.matches(vaxis.Key.escape, .{}))
-                    self.current_level -|= 1;
+                    self.current_node = self.current_node.parent.?;
             },
             .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
         }
     }
 
-    pub fn draw(self: *MyApp, allocator: std.mem.Allocator, all_items: [4]std.ArrayList(File), context: *vaxis.widgets.Table.TableContext) !void {
+    pub fn draw(self: *MyApp, allocator: std.mem.Allocator, context: *vaxis.widgets.Table.TableContext) !void {
         const win = self.vx.window();
         win.clear();
 
-        const item_list = all_items[self.current_level];
+        var list = std.ArrayList(File).init(allocator);
+        defer list.deinit();
+        for (self.current_node.children.items) |child| {
+            try list.append(File{ .name = child.value.name });
+        }
 
         try vaxis.widgets.Table.drawTable(
             allocator,
             win,
             &.{"Name"},
-            item_list,
+            list,
             context,
         );
     }
 };
 
 pub const File = struct { name: []const u8 };
-
-pub fn createTestList(allocator: std.mem.Allocator) ![4]std.ArrayList(File) {
-    const first_file_structure = [_]File{
-        .{ .name = "something.txt" },
-    };
-    const second_file_structure = [_]File{
-        .{ .name = "some/thing.txt" },
-        .{ .name = "some/thing" },
-    };
-    const third_file_structure = [_]File{
-        .{ .name = "some/thing/funny.txt" },
-        .{ .name = "some/thing/to" },
-    };
-    const fourth_file_structure = [_]File{ .{ .name = "some/thing/to/install.txt" }, .{ .name = "some/thing/to/do.txt" } };
-
-    const first_buf = try allocator.dupe(File, first_file_structure[0..]);
-    const first_list = std.ArrayList(File).fromOwnedSlice(allocator, first_buf);
-
-    const second_buf = try allocator.dupe(File, second_file_structure[0..]);
-    const second_list = std.ArrayList(File).fromOwnedSlice(allocator, second_buf);
-
-    const third_buf = try allocator.dupe(File, third_file_structure[0..]);
-    const third_list = std.ArrayList(File).fromOwnedSlice(allocator, third_buf);
-
-    const fourth_buf = try allocator.dupe(File, fourth_file_structure[0..]);
-    const fourth_list = std.ArrayList(File).fromOwnedSlice(allocator, fourth_buf);
-
-    return .{ first_list, second_list, third_list, fourth_list };
-}

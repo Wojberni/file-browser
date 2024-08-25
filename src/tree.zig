@@ -6,12 +6,14 @@ pub const Tree = struct {
     root: Node,
 
     pub fn init(allocator: std.mem.Allocator, root_dir_name: []const u8) !Tree {
-        const current_dir = try std.fs.cwd().openDir(root_dir_name, .{ .iterate = true });
+        var current_dir = try std.fs.cwd().openDir(root_dir_name, .{ .iterate = true });
+        errdefer current_dir.close();
         const current_path = try current_dir.realpathAlloc(allocator, ".");
         defer allocator.free(current_path);
         const current_dir_name = std.fs.path.basename(current_path);
 
         const allocated_file_name = try allocator.alloc(u8, current_dir_name.len);
+        errdefer allocator.free(allocated_file_name);
         std.mem.copyForwards(u8, allocated_file_name, current_dir_name);
 
         const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .dir = current_dir });

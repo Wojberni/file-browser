@@ -3,7 +3,7 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    
+
     // Vaxis dependency for GUI
     const vaxis_dep = b.dependency("vaxis", .{
         .target = target,
@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) void {
     const test_run = b.addRunArtifact(tests);
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&test_run.step);
-    
+
     // zig build gui
     const gui = b.addExecutable(.{
         .name = "gui",
@@ -53,7 +53,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     gui.root_module.addImport("vaxis", vaxis_dep.module("vaxis"));
-    
+    gui.root_module.addImport("file-browser", file_browser_mod);
+
     const gui_run = b.addRunArtifact(gui);
     gui_run.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
