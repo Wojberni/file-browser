@@ -23,7 +23,7 @@ pub const MyApp = struct {
             .tty = try vaxis.Tty.init(),
             .vx = try vaxis.init(allocator, .{}),
             .tree = tree,
-            .current_node = &tree.root,
+            .current_node = tree.root,
         };
     }
 
@@ -54,10 +54,10 @@ pub const MyApp = struct {
 
             const event = loop.nextEvent();
             try self.update(&table_context, event);
-
             try self.draw(event_alloc, &table_context);
 
             var buffered = self.tty.bufferedWriter();
+
             try self.vx.render(buffered.writer().any());
             try buffered.flush();
         }
@@ -76,10 +76,14 @@ pub const MyApp = struct {
                     table_context.col -|= 1;
                 if (key.matchesAny(&.{ vaxis.Key.right, 'l' }, .{}))
                     table_context.col +|= 1;
-                if (key.matches(vaxis.Key.enter, .{}))
-                    self.current_node = &self.current_node.children.items[0];
-                if (key.matches(vaxis.Key.escape, .{}))
+                if (key.matches(vaxis.Key.enter, .{}) and self.current_node.children.items[table_context.row].children.items.len > 0) {
+                    self.current_node = self.current_node.children.items[table_context.row];
+                    table_context.row = 0;
+                }
+                if (key.matches(vaxis.Key.escape, .{}) and self.current_node.parent != null) {
                     self.current_node = self.current_node.parent.?;
+                    table_context.row = 0;
+                }
             },
             .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
         }
@@ -89,10 +93,10 @@ pub const MyApp = struct {
         const win = self.vx.window();
         win.clear();
 
-        var list = std.ArrayList(File).init(allocator);
+        var list = std.ArrayList(Name).init(allocator);
         defer list.deinit();
         for (self.current_node.children.items) |child| {
-            try list.append(File{ .name = child.value.name });
+            try list.append(Name{ .name = child.value.name });
         }
 
         try vaxis.widgets.Table.drawTable(
@@ -105,4 +109,4 @@ pub const MyApp = struct {
     }
 };
 
-pub const File = struct { name: []const u8 };
+pub const Name = struct { name: []const u8 };

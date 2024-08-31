@@ -3,7 +3,7 @@ const Node = @import("node.zig").Node;
 const FileStruct = @import("file_struct.zig").FileStruct;
 
 pub const Tree = struct {
-    root: Node,
+    root: *Node,
 
     pub fn init(allocator: std.mem.Allocator, root_dir_name: []const u8) !Tree {
         var current_dir = try std.fs.cwd().openDir(root_dir_name, .{ .iterate = true });
@@ -17,7 +17,7 @@ pub const Tree = struct {
         std.mem.copyForwards(u8, allocated_file_name, current_dir_name);
 
         const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .dir = current_dir });
-        return .{ .root = Node.init(allocator, null, file_struct) };
+        return .{ .root = try Node.init(allocator, null, file_struct) };
     }
 
     pub fn deinit(self: *Tree) void {
@@ -40,7 +40,7 @@ pub const Tree = struct {
         try self.root.insertNodeWithPath(path);
     }
 
-    pub fn deleteNodeWithPath(self: *Tree, path: []const u8) !Node {
+    pub fn deleteNodeWithPath(self: *Tree, path: []const u8) !*Node {
         return try self.root.deleteNodeWithPath(path);
     }
 };

@@ -6,7 +6,7 @@ const MAX_PATH = std.os.linux.PATH_MAX;
 
 pub const Node = struct {
     value: FileStruct,
-    children: std.ArrayList(Node),
+    children: std.ArrayList(*Node),
     allocator: std.mem.Allocator,
     parent: ?*Node,
 
@@ -14,14 +14,20 @@ pub const Node = struct {
         NotFound,
     };
 
-    pub fn init(allocator: std.mem.Allocator, parent: ?*Node, value: FileStruct) Node {
-        var children = std.ArrayList(Node).init(allocator);
+    pub fn init(allocator: std.mem.Allocator, parent: ?*Node, value: FileStruct) !*Node {
+        var children = std.ArrayList(*Node).init(allocator);
         errdefer children.deinit();
-
-        return .{ .value = value, .children = children, .allocator = allocator, .parent = parent };
+        const node = try allocator.create(Node);
+        errdefer allocator.destroy(node);
+        node.* = .{ .value = value, .children = children, .allocator = allocator, .parent = parent };
+        return node;
     }
 
     pub fn deinit(self: *const Node) void {
+        for (self.children.items) |child| {
+            child.deinit();
+        }
+        self.children.deinit();
         self.allocator.free(self.value.name);
         switch (self.value.file_union) {
             .dir => |dir| {
@@ -33,19 +39,7 @@ pub const Node = struct {
                 node_file.close();
             },
         }
-        for (self.children.items) |child| {
-            switch (child.value.file_union) {
-                .dir => {
-                    child.deinit();
-                },
-                .file => |file| {
-                    self.allocator.free(child.value.name);
-                    var child_file = file;
-                    child_file.close();
-                },
-            }
-        }
-        self.children.deinit();
+        self.allocator.destroy(self);
     }
 
     pub fn loadNodeChildren(self: *Node) !void {
@@ -59,11 +53,13 @@ pub const Node = struct {
                         try node.loadNodeChildren();
                         continue;
                     }
-                    const entry_dir = try root_dir.openDir(entry.name, .{ .iterate = true });
+                    var entry_dir = try root_dir.openDir(entry.name, .{ .iterate = true });
+                    errdefer entry_dir.close();
                     const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
+                    errdefer self.allocator.free(allocated_file_name);
 
                     const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .dir = entry_dir });
-                    const node = Node.init(self.allocator, self, file_struct);
+                    const node = try Node.init(self.allocator, self, file_struct);
                     try self.children.append(node);
                     try self.children.items[self.children.items.len - 1].loadNodeChildren();
                 },
@@ -71,11 +67,13 @@ pub const Node = struct {
                     if (self.checkIfChildExists(entry.name)) |_| {
                         continue;
                     }
-                    const entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_only });
+                    var entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_only });
+                    errdefer entry_file.close();
                     const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
+                    errdefer self.allocator.free(allocated_file_name);
 
                     const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .file = entry_file });
-                    try self.children.append(Node.init(self.allocator, self, file_struct));
+                    try self.children.append(try Node.init(self.allocator, self, file_struct));
                 },
                 else => unreachable,
             }
@@ -92,6 +90,7 @@ pub const Node = struct {
                 continue;
             }
             const allocated_name = try std.fmt.allocPrint(self.allocator, "{s}", .{path_item});
+            errdefer self.allocator.free(allocated_name);
             var file_struct: FileStruct = undefined;
             if (std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
                 const dir = try node_iter.value.file_union.dir.openDir(path_item, .{ .iterate = true });
@@ -100,13 +99,13 @@ pub const Node = struct {
                 const file = try node_iter.value.file_union.dir.openFile(path_item, .{ .mode = std.fs.File.OpenMode.read_only });
                 file_struct = FileStruct.init(allocated_name, FileStruct.FileUnion{ .file = file });
             }
-            const node = Node.init(self.allocator, node_iter, file_struct);
+            const node = try Node.init(self.allocator, node_iter, file_struct);
             try node_iter.children.append(node);
-            node_iter = &node_iter.children.items[node_iter.children.items.len - 1];
+            node_iter = node_iter.children.items[node_iter.children.items.len - 1];
         }
     }
 
-    pub fn deleteNodeWithPath(self: *Node, path: []const u8) !Node {
+    pub fn deleteNodeWithPath(self: *Node, path: []const u8) !*Node {
         var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
         var node_iter = self;
         while (path_items_iterator.next()) |path_item| {
@@ -123,7 +122,7 @@ pub const Node = struct {
     }
 
     fn checkIfChildExists(self: *const Node, name: []const u8) ?*Node {
-        for (self.children.items) |*item| {
+        for (self.children.items) |item| {
             if (std.mem.eql(u8, name, item.value.name)) {
                 return item;
             }
@@ -132,7 +131,7 @@ pub const Node = struct {
     }
 
     fn getChildIndex(self: *const Node, name: []const u8) !usize {
-        for (self.children.items, 0..) |*item, index| {
+        for (self.children.items, 0..) |item, index| {
             if (std.mem.eql(u8, name, item.value.name)) {
                 return index;
             }
@@ -150,7 +149,7 @@ pub const Node = struct {
             if (std.mem.eql(u8, current_node.value.name, name)) {
                 return current_node.getNodePathFromRoot();
             }
-            for (current_node.children.items) |*child| {
+            for (current_node.children.items) |child| {
                 try queue.insert(0, child);
             }
         }
