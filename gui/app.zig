@@ -75,9 +75,16 @@ pub const MyApp = struct {
                     table_context.row -|= 1;
                 if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{}))
                     table_context.row +|= 1;
-                if (key.matches(vaxis.Key.enter, .{}) and self.current_node.children.items[table_context.row].children.items.len > 0) {
-                    self.current_node = self.current_node.children.items[table_context.row];
-                    table_context.row = 0;
+                if (key.matches(vaxis.Key.enter, .{}) and self.current_node.children.items.len > 0) {
+                    const selected_item_type = self.current_node.children.items[table_context.row].value.file_union;
+                    const selected_dir = switch (selected_item_type) {
+                        .dir => true,
+                        .file => false,
+                    };
+                    if (selected_dir) {
+                        self.current_node = self.current_node.children.items[table_context.row];
+                        table_context.row = 0;
+                    }
                 }
                 if (key.matches(vaxis.Key.escape, .{}) and self.current_node.parent != null) {
                     self.current_node = self.current_node.parent.?;
