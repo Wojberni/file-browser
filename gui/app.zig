@@ -16,23 +16,6 @@ pub const MyApp = struct {
 
     const TableEntry = struct { name: []const u8, type: []const u8 };
 
-    fn getCurrentDir(allocator: std.mem.Allocator, node: *Node) ![]const u8 {
-        const current_dir_name = try node.getPathFromRoot();
-        defer allocator.free(current_dir_name);
-        const placeholder = "\n\tCurrent Dir: ";
-
-        const concatenated_name = try allocator.alloc(u8, placeholder.len + current_dir_name.len + 1);
-
-        for (placeholder, 0..) |byte, i| {
-            concatenated_name[i] = byte;
-        }
-        for (current_dir_name, 0..) |byte, i| {
-            concatenated_name[placeholder.len + i] = byte;
-        }
-        concatenated_name[placeholder.len + current_dir_name.len] = '\n';
-        return concatenated_name;
-    }
-
     pub fn init(allocator: std.mem.Allocator) !MyApp {
         var tree = try Tree.init(allocator, ".");
         errdefer tree.deinit();
@@ -74,7 +57,7 @@ pub const MyApp = struct {
 
             const event = loop.nextEvent();
             try self.update(&table_context, event);
-            const current_dir_name = try getCurrentDir(self.allocator, self.current_node);
+            const current_dir_name = try self.current_node.getPathFromRoot();
             defer self.allocator.free(current_dir_name);
             try self.draw(event_alloc, &table_context, current_dir_name);
 
@@ -124,36 +107,44 @@ pub const MyApp = struct {
             \\  / /_  / / / _ \______/ __ \/ ___/ __ | | /| / / ___/ _ \/ ___/
             \\ / __/ / / /  __/_____/ /_/ / /  / /_/ | |/ |/ (__  /  __/ /
             \\/_/   /_/_/\___/     /_.___/_/   \____/|__/|__/____/\___/_/
+            \\
         ;
         const tutorial_text =
+            \\-----------------------------------------------------------------------------------------------------------
             \\Move up   -> Arrow up / k         Move into directory      -> Enter           Quit program -> Ctrl + c
             \\Move down -> Arrow down / j       Move to parent directory -> Esc
+            \\-----------------------------------------------------------------------------------------------------------
+            \\
         ;
 
         const logo = vaxis.Cell.Segment{
             .text = logo_text,
-            .style = .{},
+            .style = .{ .fg = .{ .rgb = .{ 64, 128, 255 } } },
         };
         const tutorial = vaxis.Cell.Segment{
             .text = tutorial_text,
-            .style = .{},
+            .style = .{ .fg = .{ .rgb = .{ 64, 128, 255 } } },
+        };
+        const current_dir_description = vaxis.Cell.Segment{
+            .text = "\n       Current Dir: ",
+            .style = .{ .bold = true, .fg = .{ .rgb = .{ 200, 50, 50 } } },
         };
         const current_dir = vaxis.Cell.Segment{
             .text = current_dir_name,
-            .style = .{ .bold = true },
+            .style = .{ .bold = true, .italic = true, .fg = .{ .rgb = .{ 200, 50, 50 } } },
         };
 
-        var title_segment = [_]vaxis.Cell.Segment{ logo, tutorial, current_dir };
+        var title_segment = [_]vaxis.Cell.Segment{ logo, tutorial, current_dir_description, current_dir };
 
         // - Top
-        const top_div_height = 10;
+        const top_div_height = 12;
         const top_bar = win.initChild(
             0,
             0,
             .{ .limit = win.width },
             .{ .limit = top_div_height },
         );
-        _ = try top_bar.print(title_segment[0..], .{ .wrap = .word });
+        _ = try top_bar.print(title_segment[0..], .{});
 
         // - Middle
         const middle_bar = win.initChild(

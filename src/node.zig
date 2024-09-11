@@ -76,6 +76,7 @@ pub const Node = struct {
                     try self.children.append(try Node.init(self.allocator, self, file_struct));
                 },
                 else => unreachable,
+                // TODO: add std.fs.File.Kind.sym_link support?
             }
         }
     }
