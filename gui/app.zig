@@ -16,6 +16,23 @@ pub const MyApp = struct {
 
     const TableEntry = struct { name: []const u8, type: []const u8 };
 
+    fn getCurrentDir(allocator: std.mem.Allocator, node: *Node) ![]const u8 {
+        const current_dir_name = try node.getPathFromRoot();
+        defer allocator.free(current_dir_name);
+        const placeholder = "\n\tCurrent Dir: ";
+
+        const concatenated_name = try allocator.alloc(u8, placeholder.len + current_dir_name.len + 1);
+
+        for (placeholder, 0..) |byte, i| {
+            concatenated_name[i] = byte;
+        }
+        for (current_dir_name, 0..) |byte, i| {
+            concatenated_name[placeholder.len + i] = byte;
+        }
+        concatenated_name[placeholder.len + current_dir_name.len] = '\n';
+        return concatenated_name;
+    }
+
     pub fn init(allocator: std.mem.Allocator) !MyApp {
         var tree = try Tree.init(allocator, ".");
         errdefer tree.deinit();
@@ -57,7 +74,9 @@ pub const MyApp = struct {
 
             const event = loop.nextEvent();
             try self.update(&table_context, event);
-            try self.draw(event_alloc, &table_context);
+            const current_dir_name = try getCurrentDir(self.allocator, self.current_node);
+            defer self.allocator.free(current_dir_name);
+            try self.draw(event_alloc, &table_context, current_dir_name);
 
             var buffered = self.tty.bufferedWriter();
 
@@ -71,9 +90,9 @@ pub const MyApp = struct {
             .key_press => |key| {
                 if (key.matches('c', .{ .ctrl = true }))
                     self.should_quit = true;
-                if (key.matchesAny(&.{ vaxis.Key.up, 'k' }, .{}))
+                if (key.matchesAny(&.{ vaxis.Key.up, 'k' }, .{}) and self.current_node.children.items.len > 0)
                     table_context.row -|= 1;
-                if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{}))
+                if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{}) and self.current_node.children.items.len > 0)
                     table_context.row +|= 1;
                 if (key.matches(vaxis.Key.enter, .{}) and self.current_node.children.items.len > 0) {
                     const selected_item_type = self.current_node.children.items[table_context.row].value.file_union;
@@ -95,7 +114,7 @@ pub const MyApp = struct {
         }
     }
 
-    pub fn draw(self: *MyApp, allocator: std.mem.Allocator, context: *vaxis.widgets.Table.TableContext) !void {
+    pub fn draw(self: *MyApp, allocator: std.mem.Allocator, context: *vaxis.widgets.Table.TableContext, current_dir_name: []const u8) !void {
         const win = self.vx.window();
         win.clear();
 
@@ -107,9 +126,8 @@ pub const MyApp = struct {
             \\/_/   /_/_/\___/     /_.___/_/   \____/|__/|__/____/\___/_/
         ;
         const tutorial_text =
-            \\Arrow up / k -> Move up       Arrow down / j -> Move down
-            \\Enter -> Move into directory  Esc -> Move to parent directory
-            \\Ctrl + c -> Quit program
+            \\Move up   -> Arrow up / k         Move into directory      -> Enter           Quit program -> Ctrl + c
+            \\Move down -> Arrow down / j       Move to parent directory -> Esc
         ;
 
         const logo = vaxis.Cell.Segment{
@@ -120,25 +138,29 @@ pub const MyApp = struct {
             .text = tutorial_text,
             .style = .{},
         };
+        const current_dir = vaxis.Cell.Segment{
+            .text = current_dir_name,
+            .style = .{ .bold = true },
+        };
 
-        var title_segment = [_]vaxis.Cell.Segment{ logo, tutorial };
+        var title_segment = [_]vaxis.Cell.Segment{ logo, tutorial, current_dir };
 
         // - Top
-        const top_div = 6;
+        const top_div_height = 10;
         const top_bar = win.initChild(
             0,
             0,
             .{ .limit = win.width },
-            .{ .limit = win.height / top_div },
+            .{ .limit = top_div_height },
         );
         _ = try top_bar.print(title_segment[0..], .{ .wrap = .word });
 
         // - Middle
         const middle_bar = win.initChild(
             0,
-            win.height / top_div,
+            top_div_height,
             .{ .limit = win.width },
-            .{ .limit = win.height - (top_bar.height + 1) },
+            .{ .limit = win.height - top_bar.height },
         );
 
         var list = std.ArrayList(TableEntry).init(allocator);

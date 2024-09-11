@@ -147,7 +147,7 @@ pub const Node = struct {
         while (queue.items.len > 0) {
             const current_node = queue.pop();
             if (std.mem.eql(u8, current_node.value.name, name)) {
-                return current_node.getNodePathFromRoot();
+                return current_node.getPathFromRoot();
             }
             for (current_node.children.items) |child| {
                 try queue.insert(0, child);
@@ -156,7 +156,7 @@ pub const Node = struct {
         return SearchError.NotFound;
     }
 
-    fn getNodePathFromRoot(self: ?*const Node) ![]const u8 {
+    pub fn getPathFromRoot(self: ?*const Node) ![]const u8 {
         var queue = std.ArrayList([]u8).init(self.?.allocator);
         defer queue.deinit();
 
