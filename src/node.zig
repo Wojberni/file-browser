@@ -41,6 +41,13 @@ pub const Node = struct {
         }
         self.allocator.destroy(self);
     }
+    
+    pub fn isChildless(self: *Node) bool {
+        if (self.children.items.len > 0) {
+            return false;
+        }
+        return true;
+    }
 
     pub fn loadNodeChildren(self: *Node) !void {
         const root_dir = self.value.file_union.dir;

@@ -4,8 +4,6 @@ const Tree = @import("file-browser").Tree;
 const Node = @import("file-browser").Node;
 const FileStruct = @import("file-browser").FileStruct;
 
-const Event = union(enum) { key_press: vaxis.Key, winsize: vaxis.Winsize };
-
 pub const MyApp = struct {
     allocator: std.mem.Allocator,
     should_quit: bool,
@@ -14,9 +12,12 @@ pub const MyApp = struct {
     tree: Tree,
     current_node: *Node,
     table_context: vaxis.widgets.Table.TableContext = undefined,
-    dialog_context: vaxis.widgets.Table.TableContext = undefined,
+    dialog: TypeDialog = undefined,
 
     const TableEntry = struct { name: []const u8, type: []const u8 };
+
+    const Event = union(enum) { key_press: vaxis.Key, winsize: vaxis.Winsize };
+    const TypeDialog = enum { delete, create_file, create_dir, find };
 
     pub fn init(allocator: std.mem.Allocator) !MyApp {
         var tree = try Tree.init(allocator, ".");
@@ -51,38 +52,37 @@ pub const MyApp = struct {
         const selected_bg: vaxis.Cell.Color = .{ .rgb = .{ 64, 128, 255 } };
         self.table_context = .{ .selected_bg = selected_bg };
         self.table_context.active = true;
-        self.dialog_context = .{ .selected_bg = selected_bg };
-        self.dialog_context.active = false;
 
         while (!self.should_quit) {
-            var event_arena = std.heap.ArenaAllocator.init(self.allocator);
-            defer event_arena.deinit();
-            const event_alloc = event_arena.allocator();
-
             const event = loop.nextEvent();
-            try self.update(event);
+
             const current_dir_name = try self.current_node.getPathFromRoot();
             defer self.allocator.free(current_dir_name);
-            try self.draw(event_alloc, current_dir_name);
+
+            try self.update(event, current_dir_name);
+
+            const updated_dir_name = try self.current_node.getPathFromRoot();
+            defer self.allocator.free(updated_dir_name);
+
+            try self.draw(updated_dir_name);
 
             var buffered = self.tty.bufferedWriter();
-
             try self.vx.render(buffered.writer().any());
             try buffered.flush();
         }
     }
 
-    fn update(self: *MyApp, event: Event) !void {
+    fn update(self: *MyApp, event: Event, curr_dir: []const u8) !void {
         if (self.table_context.active) {
             switch (event) {
                 .key_press => |key| {
                     if (key.matches('c', .{ .ctrl = true }))
                         self.should_quit = true;
-                    if (key.matchesAny(&.{ vaxis.Key.up, 'k' }, .{}) and self.current_node.children.items.len > 0)
+                    if (key.matchesAny(&.{ vaxis.Key.up, 'k' }, .{}) and !self.current_node.isChildless())
                         self.table_context.row -|= 1;
-                    if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{}) and self.current_node.children.items.len > 0)
+                    if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{}) and !self.current_node.isChildless())
                         self.table_context.row +|= 1;
-                    if (key.matches(vaxis.Key.enter, .{}) and self.current_node.children.items.len > 0) {
+                    if (key.matches(vaxis.Key.enter, .{}) and !self.current_node.isChildless()) {
                         const selected_item_type = self.current_node.children.items[self.table_context.row].value.file_union;
                         const selected_dir = switch (selected_item_type) {
                             .dir => true,
@@ -99,99 +99,74 @@ pub const MyApp = struct {
                     }
                     if (key.matches('d', .{ .ctrl = true })) {
                         self.table_context.active = false;
-                        self.dialog_context.active = true;
+                        self.dialog = .delete;
                     }
                 },
                 .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
             }
-        } else if (self.dialog_context.active) {
-            switch (event) {
-                .key_press => |key| {
-                    if (key.matches('c', .{ .ctrl = true }))
-                        self.should_quit = true;
-                    if (key.matchesAny(&.{ vaxis.Key.left, 'h' }, .{}))
-                        self.dialog_context.col -|= 1;
-                    if (key.matchesAny(&.{ vaxis.Key.right, 'l' }, .{}))
-                        self.dialog_context.col +|= 1;
-                    if (key.matches('y', .{})) {
-                        self.dialog_context.active = false;
-                        self.table_context.active = true;
-                    }
-                    if (key.matches('n', .{})) {
-                        self.dialog_context.active = false;
-                        self.table_context.active = true;
+        } else {
+            switch (self.dialog) {
+                .delete => {
+                    switch (event) {
+                        .key_press => |key| {
+                            if (key.matches('c', .{ .ctrl = true }))
+                                self.should_quit = true;
+                            if (key.matches('y', .{}) and !self.current_node.isChildless()) {
+                                self.table_context.active = true;
+                                self.dialog = undefined;
+                                const selected = self.current_node.children.items[self.table_context.row].value.name;
+                                const end_delimit = "/";
+                                const curr_dir_end_index = std.mem.indexOf(u8, curr_dir, end_delimit);
+                                if (curr_dir_end_index) |end_index| {
+                                    const subpath_len = curr_dir.len - (end_index + end_delimit.len);
+                                    const deleted = try self.allocator.alloc(u8, subpath_len + end_delimit.len + selected.len);
+                                    defer self.allocator.free(deleted);
+                                    for (0..subpath_len) |index| {
+                                        deleted[index] = curr_dir[end_index + end_delimit.len + index];
+                                    }
+                                    deleted[subpath_len] = end_delimit[0];
+                                    for (selected, 0..) |item, index| {
+                                        deleted[subpath_len + end_delimit.len + index] = item;
+                                    }
+                                    const deleted_node = try self.tree.deleteNodeWithPath(deleted);
+                                    defer deleted_node.deinit();
+                                } else {
+                                    const deleted_node = try self.tree.deleteNodeWithPath(selected);
+                                    defer deleted_node.deinit();
+                                }
+                            }
+                            if (key.matches('n', .{})) {
+                                self.table_context.active = true;
+                                self.dialog = undefined;
+                            }
+                        },
+                        .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
                     }
                 },
-                .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
+                else => unreachable,
             }
         }
     }
 
-    fn draw(self: *MyApp, allocator: std.mem.Allocator, current_dir_name: []const u8) !void {
+    fn draw(self: *MyApp, curr_dir: []const u8) !void {
         var win = self.vx.window();
         win.clear();
 
-        const top_bar_height = 14;
+        const top_bar_height: usize = 14;
 
-        try drawTopBar(&win, current_dir_name, top_bar_height);
+        try drawTopBar(&win, curr_dir, top_bar_height);
 
-        // - Middle
         if (self.table_context.active) {
-            const middle_bar = win.child(.{
-                .x_off = 0,
-                .y_off = top_bar_height,
-                .height = .{ .limit = win.height - top_bar_height },
-                .border = .{
-                    .where = .all,
-                    .glyphs = .single_rounded,
-                },
-            });
-
-            var list = std.ArrayList(TableEntry).init(allocator);
-            defer list.deinit();
-            for (self.current_node.children.items) |child| {
-                var file_type: []const u8 = undefined;
-                switch (child.value.file_union) {
-                    FileStruct.FileUnion.file => file_type = "File",
-                    FileStruct.FileUnion.dir => file_type = "Directory",
-                }
-                try list.append(.{ .name = child.value.name, .type = file_type });
+            try self.drawMiddleTable(&win, top_bar_height);
+        } else {
+            switch (self.dialog) {
+                .delete => try drawDeleteDialog(&win, top_bar_height),
+                else => unreachable,
             }
-
-            try vaxis.widgets.Table.drawTable(
-                allocator,
-                middle_bar,
-                &.{ "Name", "Type" },
-                list,
-                &self.table_context,
-            );
-        }
-
-        // Dialog box
-        if (self.dialog_context.active) {
-            const dialog_text = "Are you sure you want to delete this file?\nPress y/n to confirm/decline";
-
-            const dialog_bar = win.child(.{
-                .x_off = (win.width - dialog_text.len) / 2,
-                .y_off = top_bar_height,
-                .width = .{ .limit = dialog_text.len }, //FIXME: length fix, this is wrong
-                .height = .{ .limit = 4 },
-                .border = .{
-                    .where = .all,
-                    .glyphs = .single_rounded,
-                },
-            });
-            const dialog_segment = vaxis.Cell.Segment{
-                .text = dialog_text,
-                .style = .{},
-            };
-            var segment_array = [_]vaxis.Cell.Segment{dialog_segment};
-
-            _ = try dialog_bar.print(segment_array[0..], .{});
         }
     }
 
-    fn drawTopBar(win: *vaxis.Window, curr_dir: []const u8, top_bar_height: comptime_int) !void {
+    fn drawTopBar(win: *vaxis.Window, curr_dir: []const u8, top_bar_height: usize) !void {
         const logo_text =
             \\      _______ __           __
             \\     / ____(_/ ___        / /_  _________ _      __________  _____
@@ -229,15 +204,71 @@ pub const MyApp = struct {
 
         var segment_array = [_]vaxis.Cell.Segment{ logo_segment, tutor_segment, curr_dir_text_segment, curr_dir_segment };
 
-        // FIXME: change glyphs to custom
-        // const single_rounded: [6][]const u8 = .{ "#", "#", "#", "#", "#", "#" };
         const top_bar = win.child(.{
             .height = .{ .limit = top_bar_height },
+            .border = .{
+                .where = .all,
+                .glyphs = .{ .custom = .{ "#", "#", "#", "#", "#", "#" } },
+                .style = .{ .fg = .{ .rgb = .{ 64, 128, 255 } } },
+            },
+        });
+        _ = try top_bar.print(segment_array[0..], .{});
+    }
+
+    fn drawMiddleTable(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !void {
+        var event_arena = std.heap.ArenaAllocator.init(self.allocator);
+        defer event_arena.deinit();
+        const event_alloc = event_arena.allocator();
+
+        const middle_bar = win.child(.{
+            .x_off = 0,
+            .y_off = top_bar_height,
+            .height = .{ .limit = win.height - top_bar_height },
             .border = .{
                 .where = .all,
                 .glyphs = .single_rounded,
             },
         });
-        _ = try top_bar.print(segment_array[0..], .{});
+
+        var list = std.ArrayList(TableEntry).init(event_alloc);
+        defer list.deinit();
+        for (self.current_node.children.items) |child| {
+            var file_type: []const u8 = undefined;
+            switch (child.value.file_union) {
+                FileStruct.FileUnion.file => file_type = "File",
+                FileStruct.FileUnion.dir => file_type = "Directory",
+            }
+            try list.append(.{ .name = child.value.name, .type = file_type });
+        }
+
+        try vaxis.widgets.Table.drawTable(
+            event_alloc,
+            middle_bar,
+            &.{ "Name", "Type" },
+            list,
+            &self.table_context,
+        );
+    }
+
+    fn drawDeleteDialog(win: *vaxis.Window, top_bar_height: usize) !void {
+        const dialog_text = "Are you sure you want to delete this file/folder?\nPress y/n to confirm/decline";
+
+        const dialog_bar = win.child(.{
+            .x_off = (win.width - dialog_text.len) / 2,
+            .y_off = top_bar_height,
+            .width = .{ .limit = dialog_text.len }, //FIXME: length fix, this is wrong
+            .height = .{ .limit = 4 },
+            .border = .{
+                .where = .all,
+                .glyphs = .single_rounded,
+            },
+        });
+        const dialog_segment = vaxis.Cell.Segment{
+            .text = dialog_text,
+            .style = .{},
+        };
+        var segment_array = [_]vaxis.Cell.Segment{dialog_segment};
+
+        _ = try dialog_bar.print(segment_array[0..], .{});
     }
 };
