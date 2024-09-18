@@ -13,11 +13,12 @@ pub const MyApp = struct {
     current_node: *Node,
     table_context: vaxis.widgets.Table.TableContext = undefined,
     dialog: TypeDialog = undefined,
+    file_input: vaxis.widgets.TextInput = undefined,
 
     const TableEntry = struct { name: []const u8, type: []const u8 };
 
     const Event = union(enum) { key_press: vaxis.Key, winsize: vaxis.Winsize };
-    const TypeDialog = enum { delete, create_file, create_dir, find };
+    const TypeDialog = enum { delete, create, find };
 
     pub fn init(allocator: std.mem.Allocator) !MyApp {
         var tree = try Tree.init(allocator, ".");
@@ -53,6 +54,9 @@ pub const MyApp = struct {
         self.table_context = .{ .selected_bg = selected_bg };
         self.table_context.active = true;
 
+        self.file_input = vaxis.widgets.TextInput.init(self.allocator, &self.vx.unicode);
+        defer self.file_input.deinit();
+
         while (!self.should_quit) {
             const event = loop.nextEvent();
 
@@ -79,6 +83,9 @@ pub const MyApp = struct {
             switch (self.dialog) {
                 .delete => {
                     try self.updateDeleteDialog(event, curr_dir);
+                },
+                .create => {
+                    try self.updateCreateDialog(event);
                 },
                 else => unreachable,
             }
@@ -112,6 +119,10 @@ pub const MyApp = struct {
                 if (key.matches('d', .{ .ctrl = true })) {
                     self.table_context.active = false;
                     self.dialog = .delete;
+                }
+                if (key.matches('c', .{})) {
+                    self.table_context.active = false;
+                    self.dialog = .create;
                 }
             },
             .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
@@ -149,11 +160,27 @@ pub const MyApp = struct {
         }
     }
 
+    fn updateCreateDialog(self: *MyApp, event: Event) !void {
+        switch (event) {
+            .key_press => |key| {
+                if (key.matches('c', .{ .ctrl = true })) {
+                    self.should_quit = true;
+                } else if (key.matches(vaxis.Key.enter, .{})) {
+                    self.table_context.active = true;
+                    self.dialog = undefined;
+                } else {
+                    try self.file_input.update(.{ .key_press = key });
+                }
+            },
+            .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
+        }
+    }
+
     fn draw(self: *MyApp, curr_dir: []const u8) !void {
         var win = self.vx.window();
         win.clear();
 
-        const top_bar_height: usize = 14;
+        const top_bar_height: usize = 15;
 
         try drawTopBar(&win, curr_dir, top_bar_height);
 
@@ -162,6 +189,7 @@ pub const MyApp = struct {
         } else {
             switch (self.dialog) {
                 .delete => try drawDeleteDialog(&win, top_bar_height),
+                .create => try self.drawCreateDialog(&win, top_bar_height),
                 else => unreachable,
             }
         }
@@ -177,11 +205,12 @@ pub const MyApp = struct {
             \\
         ;
         const tutorial_text =
-            \\----------------------------------------------------------------------------------------------------------
-            \\  Move up   -> Arrow up / k         Move into directory      -> Enter           Quit program -> Ctrl + c
-            \\  Move down -> Arrow down / j       Move to parent directory -> Esc
-            \\                                    Delete file / directory  -> Ctrl + d
-            \\----------------------------------------------------------------------------------------------------------
+            \\------------------------------------------------------------------------------------------------------------
+            \\  Move up     -> Arrow up / k         Move into directory      -> Enter           Quit program -> Ctrl + c
+            \\  Move down   -> Arrow down / j       Move to parent directory -> Esc
+            \\  Find        -> f                    Delete file / directory  -> Ctrl + d
+            \\                                      Create file (with path)  -> c
+            \\------------------------------------------------------------------------------------------------------------
             \\
         ;
         const current_dir_text = "\n      Current Dir -> ";
@@ -271,5 +300,36 @@ pub const MyApp = struct {
         var segment_array = [_]vaxis.Cell.Segment{dialog_segment};
 
         _ = try dialog_bar.print(segment_array[0..], .{});
+    }
+
+    fn drawCreateDialog(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !void {
+        const dialog_text = "Enter a file name to create\nOptionally enter a path for subdirectories to be created";
+
+        const dialog_bar = win.child(.{
+            .x_off = (win.width - dialog_text.len) / 2,
+            .y_off = top_bar_height,
+            .width = .{ .limit = dialog_text.len }, //FIXME: length fix, this is wrong
+            .height = .{ .limit = 6 },
+            .border = .{
+                .where = .all,
+                .glyphs = .single_rounded,
+            },
+        });
+        const dialog_segment = vaxis.Cell.Segment{
+            .text = dialog_text,
+            .style = .{},
+        };
+        var segment_array = [_]vaxis.Cell.Segment{dialog_segment};
+
+        _ = try dialog_bar.print(segment_array[0..], .{});
+
+        // FIXME: use dialog_bar instead of parent win?
+        const child = win.child(.{
+            .x_off = (win.width - dialog_text.len) / 2 + 1,
+            .y_off = top_bar_height + 4,
+            .width = .{ .limit = dialog_text.len }, //FIXME: length fix, this is wrong
+            .height = .{ .limit = 1 },
+        });
+        self.file_input.draw(child);
     }
 };
