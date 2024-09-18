@@ -65,7 +65,7 @@ pub const Node = struct {
                     const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
                     errdefer self.allocator.free(allocated_file_name);
 
-                    const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .dir = entry_dir });
+                    const file_struct = FileStruct.init(allocated_file_name, .{ .dir = entry_dir });
                     const node = try Node.init(self.allocator, self, file_struct);
                     try self.children.append(node);
                     try self.children.items[self.children.items.len - 1].loadNodeChildren();
@@ -79,7 +79,7 @@ pub const Node = struct {
                     const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
                     errdefer self.allocator.free(allocated_file_name);
 
-                    const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .file = entry_file });
+                    const file_struct = FileStruct.init(allocated_file_name, .{ .file = entry_file });
                     try self.children.append(try Node.init(self.allocator, self, file_struct));
                 },
                 else => unreachable,
@@ -102,10 +102,10 @@ pub const Node = struct {
             var file_struct: FileStruct = undefined;
             if (std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
                 const dir = try node_iter.value.file_union.dir.openDir(path_item, .{ .iterate = true });
-                file_struct = FileStruct.init(allocated_name, FileStruct.FileUnion{ .dir = dir });
+                file_struct = FileStruct.init(allocated_name, .{ .dir = dir });
             } else {
                 const file = try node_iter.value.file_union.dir.openFile(path_item, .{ .mode = std.fs.File.OpenMode.read_only });
-                file_struct = FileStruct.init(allocated_name, FileStruct.FileUnion{ .file = file });
+                file_struct = FileStruct.init(allocated_name, .{ .file = file });
             }
             const node = try Node.init(self.allocator, node_iter, file_struct);
             try node_iter.children.append(node);

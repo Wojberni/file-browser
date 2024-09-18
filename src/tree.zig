@@ -16,7 +16,7 @@ pub const Tree = struct {
         errdefer allocator.free(allocated_file_name);
         std.mem.copyForwards(u8, allocated_file_name, current_dir_name);
 
-        const file_struct = FileStruct.init(allocated_file_name, FileStruct.FileUnion{ .dir = current_dir });
+        const file_struct = FileStruct.init(allocated_file_name, .{ .dir = current_dir });
         return .{ .root = try Node.init(allocator, null, file_struct) };
     }
 

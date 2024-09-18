@@ -74,77 +74,78 @@ pub const MyApp = struct {
 
     fn update(self: *MyApp, event: Event, curr_dir: []const u8) !void {
         if (self.table_context.active) {
-            switch (event) {
-                .key_press => |key| {
-                    if (key.matches('c', .{ .ctrl = true }))
-                        self.should_quit = true;
-                    if (key.matchesAny(&.{ vaxis.Key.up, 'k' }, .{}) and !self.current_node.isChildless())
-                        self.table_context.row -|= 1;
-                    if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{}) and !self.current_node.isChildless())
-                        self.table_context.row +|= 1;
-                    if (key.matches(vaxis.Key.enter, .{}) and !self.current_node.isChildless()) {
-                        const selected_item_type = self.current_node.children.items[self.table_context.row].value.file_union;
-                        const selected_dir = switch (selected_item_type) {
-                            .dir => true,
-                            .file => false,
-                        };
-                        if (selected_dir) {
-                            self.current_node = self.current_node.children.items[self.table_context.row];
-                            self.table_context.row = 0;
-                        }
-                    }
-                    if (key.matches(vaxis.Key.escape, .{}) and self.current_node.parent != null) {
-                        self.current_node = self.current_node.parent.?;
-                        self.table_context.row = 0;
-                    }
-                    if (key.matches('d', .{ .ctrl = true })) {
-                        self.table_context.active = false;
-                        self.dialog = .delete;
-                    }
-                },
-                .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
-            }
+            try self.updateTable(event);
         } else {
             switch (self.dialog) {
                 .delete => {
-                    switch (event) {
-                        .key_press => |key| {
-                            if (key.matches('c', .{ .ctrl = true }))
-                                self.should_quit = true;
-                            if (key.matches('y', .{}) and !self.current_node.isChildless()) {
-                                self.table_context.active = true;
-                                self.dialog = undefined;
-                                const selected = self.current_node.children.items[self.table_context.row].value.name;
-                                const end_delimit = "/";
-                                const curr_dir_end_index = std.mem.indexOf(u8, curr_dir, end_delimit);
-                                if (curr_dir_end_index) |end_index| {
-                                    const subpath_len = curr_dir.len - (end_index + end_delimit.len);
-                                    const deleted = try self.allocator.alloc(u8, subpath_len + end_delimit.len + selected.len);
-                                    defer self.allocator.free(deleted);
-                                    for (0..subpath_len) |index| {
-                                        deleted[index] = curr_dir[end_index + end_delimit.len + index];
-                                    }
-                                    deleted[subpath_len] = end_delimit[0];
-                                    for (selected, 0..) |item, index| {
-                                        deleted[subpath_len + end_delimit.len + index] = item;
-                                    }
-                                    const deleted_node = try self.tree.deleteNodeWithPath(deleted);
-                                    defer deleted_node.deinit();
-                                } else {
-                                    const deleted_node = try self.tree.deleteNodeWithPath(selected);
-                                    defer deleted_node.deinit();
-                                }
-                            }
-                            if (key.matches('n', .{})) {
-                                self.table_context.active = true;
-                                self.dialog = undefined;
-                            }
-                        },
-                        .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
-                    }
+                    try self.updateDeleteDialog(event, curr_dir);
                 },
                 else => unreachable,
             }
+        }
+    }
+
+    fn updateTable(self: *MyApp, event: Event) !void {
+        switch (event) {
+            .key_press => |key| {
+                if (key.matches('c', .{ .ctrl = true }))
+                    self.should_quit = true;
+                if (key.matchesAny(&.{ vaxis.Key.up, 'k' }, .{}) and !self.current_node.isChildless())
+                    self.table_context.row -|= 1;
+                if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{}) and !self.current_node.isChildless())
+                    self.table_context.row +|= 1;
+                if (key.matches(vaxis.Key.enter, .{}) and !self.current_node.isChildless()) {
+                    const selected_item_type = self.current_node.children.items[self.table_context.row].value.file_union;
+                    const selected_dir = switch (selected_item_type) {
+                        .dir => true,
+                        .file => false,
+                    };
+                    if (selected_dir) {
+                        self.current_node = self.current_node.children.items[self.table_context.row];
+                        self.table_context.row = 0;
+                    }
+                }
+                if (key.matches(vaxis.Key.escape, .{}) and self.current_node.parent != null) {
+                    self.current_node = self.current_node.parent.?;
+                    self.table_context.row = 0;
+                }
+                if (key.matches('d', .{ .ctrl = true })) {
+                    self.table_context.active = false;
+                    self.dialog = .delete;
+                }
+            },
+            .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
+        }
+    }
+
+    fn updateDeleteDialog(self: *MyApp, event: Event, curr_dir: []const u8) !void {
+        switch (event) {
+            .key_press => |key| {
+                if (key.matches('c', .{ .ctrl = true }))
+                    self.should_quit = true;
+                if (key.matches('y', .{}) and !self.current_node.isChildless()) {
+                    self.table_context.active = true;
+                    self.dialog = undefined;
+                    const selected = self.current_node.children.items[self.table_context.row].value.name;
+                    const end_delimit = "/";
+                    const curr_dir_end_index = std.mem.indexOf(u8, curr_dir, end_delimit);
+                    if (curr_dir_end_index) |end_index| {
+                        const path_begin_index = end_index + end_delimit.len;
+                        const deleted = try std.fmt.allocPrint(self.allocator, "{s}{s}{s}", .{ curr_dir[path_begin_index..], end_delimit, selected });
+                        defer self.allocator.free(deleted);
+                        const deleted_node = try self.tree.deleteNodeWithPath(deleted);
+                        defer deleted_node.deinit();
+                    } else {
+                        const deleted_node = try self.tree.deleteNodeWithPath(selected);
+                        defer deleted_node.deinit();
+                    }
+                }
+                if (key.matches('n', .{})) {
+                    self.table_context.active = true;
+                    self.dialog = undefined;
+                }
+            },
+            .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
         }
     }
 
