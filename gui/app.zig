@@ -85,7 +85,7 @@ pub const MyApp = struct {
                     try self.updateDeleteDialog(event, curr_dir);
                 },
                 .create => {
-                    try self.updateCreateDialog(event);
+                    try self.updateCreateDialog(event, curr_dir);
                 },
                 else => unreachable,
             }
@@ -160,14 +160,29 @@ pub const MyApp = struct {
         }
     }
 
-    fn updateCreateDialog(self: *MyApp, event: Event) !void {
+    fn updateCreateDialog(self: *MyApp, event: Event, curr_dir: []const u8) !void {
         switch (event) {
             .key_press => |key| {
                 if (key.matches('c', .{ .ctrl = true })) {
                     self.should_quit = true;
+                } else if (key.matches('l', .{ .ctrl = true })) {
+                    self.file_input.clearRetainingCapacity();
                 } else if (key.matches(vaxis.Key.enter, .{})) {
                     self.table_context.active = true;
                     self.dialog = undefined;
+                    const new_file_name = try self.file_input.toOwnedSlice();
+                    defer self.allocator.free(new_file_name);
+                    const end_delimit = "/";
+                    const curr_dir_end_index = std.mem.indexOf(u8, curr_dir, end_delimit);
+                    if (curr_dir_end_index) |end_index| {
+                        const path_begin_index = end_index + end_delimit.len;
+                        const inserted = try std.fmt.allocPrint(self.allocator, "{s}{s}{s}", .{ curr_dir[path_begin_index..], end_delimit, new_file_name });
+                        defer self.allocator.free(inserted);
+                        try self.tree.insertNodeWithPath(inserted);
+                    } else {
+                        try self.tree.insertNodeWithPath(new_file_name);
+                    }
+                    self.file_input.clearAndFree();
                 } else {
                     try self.file_input.update(.{ .key_press = key });
                 }
@@ -179,6 +194,7 @@ pub const MyApp = struct {
     fn draw(self: *MyApp, curr_dir: []const u8) !void {
         var win = self.vx.window();
         win.clear();
+        win.hideCursor();
 
         const top_bar_height: usize = 15;
 
@@ -209,7 +225,7 @@ pub const MyApp = struct {
             \\  Move up     -> Arrow up / k         Move into directory      -> Enter           Quit program -> Ctrl + c
             \\  Move down   -> Arrow down / j       Move to parent directory -> Esc
             \\  Find        -> f                    Delete file / directory  -> Ctrl + d
-            \\                                      Create file (with path)  -> c
+            \\                                      Create file              -> c
             \\------------------------------------------------------------------------------------------------------------
             \\
         ;
@@ -303,7 +319,7 @@ pub const MyApp = struct {
     }
 
     fn drawCreateDialog(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !void {
-        const dialog_text = "Enter a file name to create\nOptionally enter a path for subdirectories to be created";
+        const dialog_text = "Enter a file name to create\nOptionally enter a path with subdirectories to be created";
 
         const dialog_bar = win.child(.{
             .x_off = (win.width - dialog_text.len) / 2,
