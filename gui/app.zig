@@ -183,6 +183,9 @@ pub const MyApp = struct {
                         try self.tree.insertNodeWithPath(new_file_name);
                     }
                     self.file_input.clearAndFree();
+                } else if (key.matches(vaxis.Key.escape, .{})) {
+                    self.table_context.active = true;
+                    self.dialog = undefined;
                 } else {
                     try self.file_input.update(.{ .key_press = key });
                 }
@@ -221,12 +224,12 @@ pub const MyApp = struct {
             \\
         ;
         const tutorial_text =
-            \\------------------------------------------------------------------------------------------------------------
-            \\  Move up     -> Arrow up / k         Move into directory      -> Enter           Quit program -> Ctrl + c
-            \\  Move down   -> Arrow down / j       Move to parent directory -> Esc
-            \\  Find        -> f                    Delete file / directory  -> Ctrl + d
-            \\                                      Create file              -> c
-            \\------------------------------------------------------------------------------------------------------------
+            \\-----------------------------------------------------------------------------
+            \\  Move up      -> Arrow up / k         Move into directory      -> Enter
+            \\  Move down    -> Arrow down / j       Move to parent directory -> Esc
+            \\  Find         -> f                    Delete file / directory  -> Ctrl + d
+            \\  Quit program -> Ctrl + c             Create file              -> c
+            \\-----------------------------------------------------------------------------
             \\
         ;
         const current_dir_text = "\n      Current Dir -> ";
@@ -298,11 +301,13 @@ pub const MyApp = struct {
 
     fn drawDeleteDialog(win: *vaxis.Window, top_bar_height: usize) !void {
         const dialog_text = "Are you sure you want to delete this file/folder?\nPress y/n to confirm/decline";
+        const borders = 2;
+        const max_width = "Are you sure you want to delete this file/folder?\n".len + borders;
 
         const dialog_bar = win.child(.{
-            .x_off = (win.width - dialog_text.len) / 2,
+            .x_off = (win.width - max_width) / 2,
             .y_off = top_bar_height,
-            .width = .{ .limit = dialog_text.len }, //FIXME: length fix, this is wrong
+            .width = .{ .limit = max_width },
             .height = .{ .limit = 4 },
             .border = .{
                 .where = .all,
@@ -319,13 +324,16 @@ pub const MyApp = struct {
     }
 
     fn drawCreateDialog(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !void {
-        const dialog_text = "Enter a file name to create\nOptionally enter a path with subdirectories to be created";
+        const dialog_text = "(Optionally enter a path with subdirectories to be created for a file)\nEnter a file name to create:";
+        const borders = 2;
+        const max_width = "(Optionally enter a path with subdirectories to be created for a file)\n".len + borders;
+        const max_height = 3;
 
         const dialog_bar = win.child(.{
-            .x_off = (win.width - dialog_text.len) / 2,
+            .x_off = (win.width - max_width) / 2,
             .y_off = top_bar_height,
-            .width = .{ .limit = dialog_text.len }, //FIXME: length fix, this is wrong
-            .height = .{ .limit = 6 },
+            .width = .{ .limit = max_width },
+            .height = .{ .limit = max_height + borders },
             .border = .{
                 .where = .all,
                 .glyphs = .single_rounded,
@@ -339,12 +347,12 @@ pub const MyApp = struct {
 
         _ = try dialog_bar.print(segment_array[0..], .{});
 
-        // FIXME: use dialog_bar instead of parent win?
+        const input_height = 1;
         const child = win.child(.{
-            .x_off = (win.width - dialog_text.len) / 2 + 1,
-            .y_off = top_bar_height + 4,
-            .width = .{ .limit = dialog_text.len }, //FIXME: length fix, this is wrong
-            .height = .{ .limit = 1 },
+            .x_off = (win.width - max_width) / 2 + borders / 2,
+            .y_off = top_bar_height + max_height,
+            .width = .{ .limit = max_width },
+            .height = .{ .limit = input_height },
         });
         self.file_input.draw(child);
     }
