@@ -33,7 +33,7 @@ test "check if tree can be traversed" {
     tree.traverseTree();
 }
 
-test "check if value can be found in tree" {
+test "check if first matching value can be found in tree" {
     var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
@@ -43,7 +43,7 @@ test "check if value can be found in tree" {
     try tree.loadTreeFromDir();
     const random_file_path = test_file_structure.getRandomFilePath();
 
-    const node_path = try tree.findMatchingNodeByName(FileUtils.getLastNameFromPath(random_file_path));
+    const node_path = try tree.findFirstMatchingName(FileUtils.getLastNameFromPath(random_file_path));
     defer ALLOCATOR.free(node_path);
     const expected_path = try std.fmt.allocPrint(ALLOCATOR, "{s}/{s}", .{ test_file_structure.test_dir_name, random_file_path });
     defer ALLOCATOR.free(expected_path);
@@ -51,7 +51,7 @@ test "check if value can be found in tree" {
     try std.testing.expectEqualStrings(expected_path, node_path);
 }
 
-test "check if value cannot be found in tree" {
+test "check if first matching value cannot be found in tree" {
     var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
     defer test_file_structure.deinit();
 
@@ -60,9 +60,47 @@ test "check if value cannot be found in tree" {
 
     try tree.loadTreeFromDir();
     const not_found_name = "aha.txt";
-    const node_path = tree.findMatchingNodeByName(not_found_name);
+    const node_path = tree.findFirstMatchingName(not_found_name);
 
     try std.testing.expect(node_path == NODE_NOT_FOUND);
+}
+
+test "check if any values containing name are found in tree" {
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    defer test_file_structure.deinit();
+
+    var tree = try Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    defer tree.deinit();
+
+    try tree.loadTreeFromDir();
+    const random_file_path = test_file_structure.getRandomFilePath();
+    const names = try tree.findAllContainingName(FileUtils.getLastNameFromPath(random_file_path));
+    defer names.deinit();
+
+    try std.testing.expect(names.items.len > 0);
+
+    for (names.items) |item| {
+        ALLOCATOR.free(item);
+    }
+}
+
+test "check if no values containing name are found in a tree" {
+    var test_file_structure = try TestFileStructure.init(ALLOCATOR, TEST_DIR_NAME);
+    defer test_file_structure.deinit();
+
+    var tree = try Tree.init(ALLOCATOR, TEST_DIR_NAME);
+    defer tree.deinit();
+
+    try tree.loadTreeFromDir();
+    const not_found_name = "aha.txt";
+    const names = try tree.findAllContainingName(not_found_name);
+    defer names.deinit();
+
+    try std.testing.expect(names.items.len == 0);
+
+    for (names.items) |item| {
+        ALLOCATOR.free(item);
+    }
 }
 
 test "check if value is inserted into tree and found after" {
@@ -77,7 +115,7 @@ test "check if value is inserted into tree and found after" {
     const inserted_node = "some/thing/interesting.txt";
     try tree.insertNodeWithPath(inserted_node);
 
-    const node_path = try tree.findMatchingNodeByName(FileUtils.getLastNameFromPath(inserted_node));
+    const node_path = try tree.findFirstMatchingName(FileUtils.getLastNameFromPath(inserted_node));
     defer ALLOCATOR.free(node_path);
     const expected_path = try std.fmt.allocPrint(ALLOCATOR, "{s}/{s}", .{ test_file_structure.test_dir_name, inserted_node });
     defer ALLOCATOR.free(expected_path);

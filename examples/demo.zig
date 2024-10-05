@@ -11,11 +11,11 @@ pub fn main() !void {
     try tree.loadTreeFromDir();
 
     const random_file_name = "main.zig";
-    const found_item = try tree.findMatchingNodeByName(random_file_name);
+    const found_item = try tree.findFirstMatchingName(random_file_name);
     defer allocator.free(found_item);
 
     const not_found_name = "aha.txt";
-    const not_found_item = tree.findMatchingNodeByName(not_found_name);
+    const not_found_item = tree.findFirstMatchingName(not_found_name);
 
     std.debug.print("Find: '{s}': {s}\n", .{ random_file_name, found_item });
     std.debug.print("Find: '{s}': {any}\n", .{ not_found_name, not_found_item });

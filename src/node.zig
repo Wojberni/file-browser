@@ -41,7 +41,7 @@ pub const Node = struct {
         }
         self.allocator.destroy(self);
     }
-    
+
     pub fn isChildless(self: *Node) bool {
         if (self.children.items.len > 0) {
             return false;
@@ -147,7 +147,7 @@ pub const Node = struct {
         return SearchError.NotFound;
     }
 
-    pub fn findMatchingNodeByName(self: *Node, name: []const u8) ![]const u8 {
+    pub fn findFirstMatchingName(self: *Node, name: []const u8) ![]const u8 {
         var queue = std.ArrayList(*Node).init(self.allocator);
         defer queue.deinit();
         try queue.insert(0, self);
@@ -162,6 +162,28 @@ pub const Node = struct {
             }
         }
         return SearchError.NotFound;
+    }
+
+    pub fn findAllContainingName(self: *Node, name: []const u8) !std.ArrayList([]const u8) {
+        var result = std.ArrayList([]const u8).init(self.allocator);
+        if (name.len == 0) {
+            return result;
+        }
+
+        var queue = std.ArrayList(*Node).init(self.allocator);
+        defer queue.deinit();
+        try queue.insert(0, self);
+
+        while (queue.items.len > 0) {
+            const current_node = queue.pop();
+            if (std.mem.indexOf(u8, current_node.value.name, name) != null) {
+                try result.insert(0, try current_node.getPathFromRoot());
+            }
+            for (current_node.children.items) |child| {
+                try queue.insert(0, child);
+            }
+        }
+        return result;
     }
 
     pub fn getPathFromRoot(self: ?*const Node) ![]const u8 {

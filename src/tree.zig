@@ -32,8 +32,12 @@ pub const Tree = struct {
         try self.root.loadNodeChildren();
     }
 
-    pub fn findMatchingNodeByName(self: *Tree, name: []const u8) ![]const u8 {
-        return try self.root.findMatchingNodeByName(name);
+    pub fn findFirstMatchingName(self: *Tree, name: []const u8) ![]const u8 {
+        return try self.root.findFirstMatchingName(name);
+    }
+
+    pub fn findAllContainingName(self: *Tree, name: []const u8) !std.ArrayList([]const u8) {
+        return try self.root.findAllContainingName(name);
     }
 
     pub fn insertNodeWithPath(self: *Tree, path: []const u8) !void {

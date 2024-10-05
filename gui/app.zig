@@ -5,17 +5,20 @@ const Node = @import("file-browser").Node;
 const FileStruct = @import("file-browser").FileStruct;
 
 pub const MyApp = struct {
+    const testing = struct {
+        name: []const u8,
+    };
+
     allocator: std.mem.Allocator,
     should_quit: bool,
     tty: vaxis.Tty,
     vx: vaxis.Vaxis,
     tree: Tree,
     current_node: *Node,
-    table_context: vaxis.widgets.Table.TableContext = undefined,
+    table_context: vaxis.widgets.Table.TableContext,
     dialog: TypeDialog = undefined,
-    file_input: vaxis.widgets.TextInput = undefined,
-
-    const TableEntry = struct { name: []const u8, type: []const u8 };
+    text_input: vaxis.widgets.TextInput = undefined,
+    find_arraylist: std.ArrayList(testing),
 
     const Event = union(enum) { key_press: vaxis.Key, winsize: vaxis.Winsize };
     const TypeDialog = enum { delete, create, find };
@@ -24,20 +27,17 @@ pub const MyApp = struct {
         var tree = try Tree.init(allocator, ".");
         errdefer tree.deinit();
         try tree.loadTreeFromDir();
-        return .{
-            .allocator = allocator,
-            .should_quit = false,
-            .tty = try vaxis.Tty.init(),
-            .vx = try vaxis.init(allocator, .{}),
-            .tree = tree,
-            .current_node = tree.root,
-        };
+
+        var table_context: vaxis.widgets.Table.TableContext = .{ .selected_bg = .{ .rgb = .{ 64, 128, 255 } } };
+        table_context.active = true;
+        return .{ .allocator = allocator, .should_quit = false, .tty = try vaxis.Tty.init(), .vx = try vaxis.init(allocator, .{}), .tree = tree, .current_node = tree.root, .table_context = table_context, .find_arraylist = std.ArrayList(testing).init(allocator) };
     }
 
     pub fn deinit(self: *MyApp) void {
         self.vx.deinit(self.allocator, self.tty.anyWriter());
         self.tty.deinit();
         self.tree.deinit();
+        self.find_arraylist.deinit();
     }
 
     pub fn run(self: *MyApp) !void {
@@ -50,12 +50,8 @@ pub const MyApp = struct {
         try self.vx.enterAltScreen(self.tty.anyWriter());
         try self.vx.queryTerminal(self.tty.anyWriter(), 1 * std.time.ns_per_s);
 
-        const selected_bg: vaxis.Cell.Color = .{ .rgb = .{ 64, 128, 255 } };
-        self.table_context = .{ .selected_bg = selected_bg };
-        self.table_context.active = true;
-
-        self.file_input = vaxis.widgets.TextInput.init(self.allocator, &self.vx.unicode);
-        defer self.file_input.deinit();
+        self.text_input = vaxis.widgets.TextInput.init(self.allocator, &self.vx.unicode);
+        defer self.text_input.deinit();
 
         while (!self.should_quit) {
             const event = loop.nextEvent();
@@ -87,7 +83,9 @@ pub const MyApp = struct {
                 .create => {
                     try self.updateCreateDialog(event, curr_dir);
                 },
-                else => unreachable,
+                .find => {
+                    try self.updateFindTable(event);
+                },
             }
         }
     }
@@ -123,6 +121,11 @@ pub const MyApp = struct {
                 if (key.matches('c', .{})) {
                     self.table_context.active = false;
                     self.dialog = .create;
+                }
+                if (key.matches('f', .{})) {
+                    self.table_context.active = false;
+                    self.dialog = .find;
+                    self.table_context.row = 0;
                 }
             },
             .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
@@ -166,11 +169,11 @@ pub const MyApp = struct {
                 if (key.matches('c', .{ .ctrl = true })) {
                     self.should_quit = true;
                 } else if (key.matches('l', .{ .ctrl = true })) {
-                    self.file_input.clearRetainingCapacity();
+                    self.text_input.clearRetainingCapacity();
                 } else if (key.matches(vaxis.Key.enter, .{})) {
                     self.table_context.active = true;
                     self.dialog = undefined;
-                    const new_file_name = try self.file_input.toOwnedSlice();
+                    const new_file_name = try self.text_input.toOwnedSlice();
                     defer self.allocator.free(new_file_name);
                     const end_delimit = "/";
                     const curr_dir_end_index = std.mem.indexOf(u8, curr_dir, end_delimit);
@@ -182,12 +185,32 @@ pub const MyApp = struct {
                     } else {
                         try self.tree.insertNodeWithPath(new_file_name);
                     }
-                    self.file_input.clearAndFree();
+                    self.text_input.clearAndFree();
                 } else if (key.matches(vaxis.Key.escape, .{})) {
                     self.table_context.active = true;
                     self.dialog = undefined;
+                    self.text_input.clearAndFree();
                 } else {
-                    try self.file_input.update(.{ .key_press = key });
+                    try self.text_input.update(.{ .key_press = key });
+                }
+            },
+            .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
+        }
+    }
+
+    fn updateFindTable(self: *MyApp, event: Event) !void {
+        switch (event) {
+            .key_press => |key| {
+                if (key.matches('c', .{ .ctrl = true })) {
+                    self.should_quit = true;
+                } else if (key.matches('l', .{ .ctrl = true })) {
+                    self.text_input.clearRetainingCapacity();
+                } else if (key.matches(vaxis.Key.escape, .{})) {
+                    self.table_context.active = true;
+                    self.dialog = undefined;
+                    self.text_input.clearAndFree();
+                } else {
+                    try self.text_input.update(.{ .key_press = key });
                 }
             },
             .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
@@ -209,7 +232,7 @@ pub const MyApp = struct {
             switch (self.dialog) {
                 .delete => try drawDeleteDialog(&win, top_bar_height),
                 .create => try self.drawCreateDialog(&win, top_bar_height),
-                else => unreachable,
+                .find => try self.drawFindTable(&win, top_bar_height),
             }
         }
     }
@@ -224,12 +247,12 @@ pub const MyApp = struct {
             \\
         ;
         const tutorial_text =
-            \\-----------------------------------------------------------------------------
-            \\  Move up      -> Arrow up / k         Move into directory      -> Enter
-            \\  Move down    -> Arrow down / j       Move to parent directory -> Esc
-            \\  Find         -> f                    Delete file / directory  -> Ctrl + d
-            \\  Quit program -> Ctrl + c             Create file              -> c
-            \\-----------------------------------------------------------------------------
+            \\---------------------------------------------------------------------------------------
+            \\  Move up      -> Arrow up / k         Move into directory / Accept       -> Enter
+            \\  Move down    -> Arrow down / j       Move to parent directory / Go back -> Esc
+            \\  Find         -> f                    Delete file / directory            -> Ctrl + d
+            \\  Quit program -> Ctrl + c             Create file                        -> c
+            \\---------------------------------------------------------------------------------------
             \\
         ;
         const current_dir_text = "\n      Current Dir -> ";
@@ -279,7 +302,7 @@ pub const MyApp = struct {
             },
         });
 
-        var list = std.ArrayList(TableEntry).init(event_alloc);
+        var list = std.ArrayList(struct { name: []const u8, type: []const u8 }).init(event_alloc);
         defer list.deinit();
         for (self.current_node.children.items) |child| {
             var file_type: []const u8 = undefined;
@@ -354,6 +377,55 @@ pub const MyApp = struct {
             .width = .{ .limit = max_width },
             .height = .{ .limit = input_height },
         });
-        self.file_input.draw(child);
+        self.text_input.draw(child);
+    }
+
+    fn drawFindTable(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !void {
+        const input_height = 1;
+        const borders = 2;
+        const child = win.child(.{
+            .x_off = 0,
+            .y_off = top_bar_height,
+            .height = .{ .limit = input_height + borders },
+            .border = .{
+                .where = .all,
+                .glyphs = .single_rounded,
+            },
+        });
+        self.text_input.draw(child);
+
+        var event_arena = std.heap.ArenaAllocator.init(self.allocator);
+        defer event_arena.deinit();
+        const event_alloc = event_arena.allocator();
+
+        const middle_bar = win.child(.{
+            .y_off = top_bar_height + input_height + borders,
+            .border = .{
+                .where = .all,
+                .glyphs = .single_rounded,
+            },
+        });
+
+        //FIXME: FIND BETTER SOLUTION FOR THIS ISSUE WITH ARRAYLIST
+        // TODO: add scroll for better table presentation
+        for (self.find_arraylist.items) |item| {
+            self.allocator.free(item.name);
+        }
+        self.find_arraylist.clearAndFree();
+
+        const searched_item = self.text_input.buf.items[0..self.text_input.buf.items.len];
+        const search_result = try self.tree.findAllContainingName(searched_item);
+        defer search_result.deinit();
+        for (search_result.items) |item| {
+            try self.find_arraylist.append(.{ .name = item });
+        }
+
+        try vaxis.widgets.Table.drawTable(
+            event_alloc,
+            middle_bar,
+            &.{"Name"},
+            self.find_arraylist,
+            &self.table_context,
+        );
     }
 };
