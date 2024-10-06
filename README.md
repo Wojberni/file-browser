@@ -1,7 +1,11 @@
 # File-browser
 
 File-browser is a project for educational purposes written in Zig.
-I was trying to remind myself, how trees work and file structure was a natural choice, as it looks like a tree.
+I was trying to remind myself, how trees work and file structure was a natural choice.
+
+> Code was tested on Linux, it is NOT Windows compatible.
+
+> TUI was developed using Kitty, due to [libvaxis](https://github.com/rockorager/libvaxis) compatibility. Some functionalities might not work as they should on other terminals.
 
 ## Basic commands
 
