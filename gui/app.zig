@@ -5,7 +5,7 @@ const Node = @import("file-browser").Node;
 const FileStruct = @import("file-browser").FileStruct;
 
 pub const MyApp = struct {
-    const testing = struct {
+    const FindName = struct {
         name: []const u8,
     };
 
@@ -15,10 +15,11 @@ pub const MyApp = struct {
     vx: vaxis.Vaxis,
     tree: Tree,
     current_node: *Node,
-    table_context: vaxis.widgets.Table.TableContext,
+    main_context: vaxis.widgets.Table.TableContext,
+    find_context: vaxis.widgets.Table.TableContext,
     dialog: TypeDialog = undefined,
     text_input: vaxis.widgets.TextInput = undefined,
-    find_arraylist: std.ArrayList(testing),
+    find_arraylist: std.ArrayList(FindName),
 
     const Event = union(enum) { key_press: vaxis.Key, winsize: vaxis.Winsize };
     const TypeDialog = enum { delete, create, find };
@@ -28,9 +29,25 @@ pub const MyApp = struct {
         errdefer tree.deinit();
         try tree.loadTreeFromDir();
 
-        var table_context: vaxis.widgets.Table.TableContext = .{ .selected_bg = .{ .rgb = .{ 64, 128, 255 } } };
-        table_context.active = true;
-        return .{ .allocator = allocator, .should_quit = false, .tty = try vaxis.Tty.init(), .vx = try vaxis.init(allocator, .{}), .tree = tree, .current_node = tree.root, .table_context = table_context, .find_arraylist = std.ArrayList(testing).init(allocator) };
+        return .{
+            .allocator = allocator,
+            .should_quit = false,
+            .tty = try vaxis.Tty.init(),
+            .vx = try vaxis.init(allocator, .{}),
+            .tree = tree,
+            .current_node = tree.root,
+            .main_context = .{
+                .selected_bg = .{
+                    .rgb = .{ 64, 128, 255 },
+                },
+            },
+            .find_context = .{
+                .selected_bg = .{
+                    .rgb = .{ 64, 128, 255 },
+                },
+            },
+            .find_arraylist = std.ArrayList(FindName).init(allocator),
+        };
     }
 
     pub fn deinit(self: *MyApp) void {
@@ -52,6 +69,7 @@ pub const MyApp = struct {
 
         self.text_input = vaxis.widgets.TextInput.init(self.allocator, &self.vx.unicode);
         defer self.text_input.deinit();
+        self.main_context.active = true;
 
         while (!self.should_quit) {
             const event = loop.nextEvent();
@@ -69,11 +87,17 @@ pub const MyApp = struct {
             var buffered = self.tty.bufferedWriter();
             try self.vx.render(buffered.writer().any());
             try buffered.flush();
+
+            //FIXME: FIND BETTER SOLUTION FOR THIS ISSUE WITH ARRAYLIST
+            for (self.find_arraylist.items) |item| {
+                self.allocator.free(item.name);
+            }
+            self.find_arraylist.clearAndFree();
         }
     }
 
     fn update(self: *MyApp, event: Event, curr_dir: []const u8) !void {
-        if (self.table_context.active) {
+        if (self.main_context.active) {
             try self.updateTable(event);
         } else {
             switch (self.dialog) {
@@ -96,36 +120,36 @@ pub const MyApp = struct {
                 if (key.matches('c', .{ .ctrl = true }))
                     self.should_quit = true;
                 if (key.matchesAny(&.{ vaxis.Key.up, 'k' }, .{}) and !self.current_node.isChildless())
-                    self.table_context.row -|= 1;
+                    self.main_context.row -|= 1;
                 if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{}) and !self.current_node.isChildless())
-                    self.table_context.row +|= 1;
+                    self.main_context.row +|= 1;
                 if (key.matches(vaxis.Key.enter, .{}) and !self.current_node.isChildless()) {
-                    const selected_item_type = self.current_node.children.items[self.table_context.row].value.file_union;
+                    const selected_item_type = self.current_node.children.items[self.main_context.row].value.file_union;
                     const selected_dir = switch (selected_item_type) {
                         .dir => true,
                         .file => false,
                     };
                     if (selected_dir) {
-                        self.current_node = self.current_node.children.items[self.table_context.row];
-                        self.table_context.row = 0;
+                        self.current_node = self.current_node.children.items[self.main_context.row];
+                        self.main_context.row = 0;
                     }
                 }
                 if (key.matches(vaxis.Key.escape, .{}) and self.current_node.parent != null) {
                     self.current_node = self.current_node.parent.?;
-                    self.table_context.row = 0;
+                    self.main_context.row = 0;
                 }
                 if (key.matches('d', .{ .ctrl = true })) {
-                    self.table_context.active = false;
+                    self.main_context.active = false;
                     self.dialog = .delete;
                 }
                 if (key.matches('c', .{})) {
-                    self.table_context.active = false;
+                    self.main_context.active = false;
                     self.dialog = .create;
                 }
                 if (key.matches('f', .{})) {
-                    self.table_context.active = false;
+                    self.main_context.active = false;
                     self.dialog = .find;
-                    self.table_context.row = 0;
+                    self.main_context.row = 0;
                 }
             },
             .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
@@ -138,9 +162,9 @@ pub const MyApp = struct {
                 if (key.matches('c', .{ .ctrl = true }))
                     self.should_quit = true;
                 if (key.matches('y', .{}) and !self.current_node.isChildless()) {
-                    self.table_context.active = true;
+                    self.main_context.active = true;
                     self.dialog = undefined;
-                    const selected = self.current_node.children.items[self.table_context.row].value.name;
+                    const selected = self.current_node.children.items[self.main_context.row].value.name;
                     const end_delimit = "/";
                     const curr_dir_end_index = std.mem.indexOf(u8, curr_dir, end_delimit);
                     if (curr_dir_end_index) |end_index| {
@@ -155,7 +179,7 @@ pub const MyApp = struct {
                     }
                 }
                 if (key.matches('n', .{})) {
-                    self.table_context.active = true;
+                    self.main_context.active = true;
                     self.dialog = undefined;
                 }
             },
@@ -171,7 +195,7 @@ pub const MyApp = struct {
                 } else if (key.matches('l', .{ .ctrl = true })) {
                     self.text_input.clearRetainingCapacity();
                 } else if (key.matches(vaxis.Key.enter, .{})) {
-                    self.table_context.active = true;
+                    self.main_context.active = true;
                     self.dialog = undefined;
                     const new_file_name = try self.text_input.toOwnedSlice();
                     defer self.allocator.free(new_file_name);
@@ -187,7 +211,7 @@ pub const MyApp = struct {
                     }
                     self.text_input.clearAndFree();
                 } else if (key.matches(vaxis.Key.escape, .{})) {
-                    self.table_context.active = true;
+                    self.main_context.active = true;
                     self.dialog = undefined;
                     self.text_input.clearAndFree();
                 } else {
@@ -203,14 +227,27 @@ pub const MyApp = struct {
             .key_press => |key| {
                 if (key.matches('c', .{ .ctrl = true })) {
                     self.should_quit = true;
-                } else if (key.matches('l', .{ .ctrl = true })) {
-                    self.text_input.clearRetainingCapacity();
-                } else if (key.matches(vaxis.Key.escape, .{})) {
-                    self.table_context.active = true;
-                    self.dialog = undefined;
-                    self.text_input.clearAndFree();
-                } else {
-                    try self.text_input.update(.{ .key_press = key });
+                } else if (self.find_context.active) {
+                    if (key.matches(vaxis.Key.escape, .{})) {
+                        self.find_context.active = false;
+                        self.find_context.row = 0;
+                    } else if (key.matchesAny(&.{ vaxis.Key.up, 'k' }, .{})) {
+                        self.find_context.row -|= 1;
+                    } else if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{})) {
+                        self.find_context.row +|= 1;
+                    }
+                } else if (!self.find_context.active) {
+                    if (key.matches('l', .{ .ctrl = true })) {
+                        self.text_input.clearRetainingCapacity();
+                    } else if (key.matches(vaxis.Key.enter, .{})) {
+                        self.find_context.active = true;
+                    } else if (key.matches(vaxis.Key.escape, .{})) {
+                        self.main_context.active = true;
+                        self.dialog = undefined;
+                        self.text_input.clearAndFree();
+                    } else {
+                        try self.text_input.update(.{ .key_press = key });
+                    }
                 }
             },
             .winsize => |ws| try self.vx.resize(self.allocator, self.tty.anyWriter(), ws),
@@ -224,9 +261,14 @@ pub const MyApp = struct {
 
         const top_bar_height: usize = 15;
 
+        if (win.width < 90)
+            return error.NotEnoughTerminalWidth;
+        if (win.height < 2 * top_bar_height)
+            return error.NotEnoughTerminalHeight;
+
         try drawTopBar(&win, curr_dir, top_bar_height);
 
-        if (self.table_context.active) {
+        if (self.main_context.active) {
             try self.drawMiddleTable(&win, top_bar_height);
         } else {
             switch (self.dialog) {
@@ -318,7 +360,7 @@ pub const MyApp = struct {
             middle_bar,
             &.{ "Name", "Type" },
             list,
-            &self.table_context,
+            &self.main_context,
         );
     }
 
@@ -406,13 +448,6 @@ pub const MyApp = struct {
             },
         });
 
-        //FIXME: FIND BETTER SOLUTION FOR THIS ISSUE WITH ARRAYLIST
-        // TODO: add scroll for better table presentation
-        for (self.find_arraylist.items) |item| {
-            self.allocator.free(item.name);
-        }
-        self.find_arraylist.clearAndFree();
-
         const searched_item = self.text_input.buf.items[0..self.text_input.buf.items.len];
         const search_result = try self.tree.findAllContainingName(searched_item);
         defer search_result.deinit();
@@ -425,7 +460,7 @@ pub const MyApp = struct {
             middle_bar,
             &.{"Name"},
             self.find_arraylist,
-            &self.table_context,
+            &self.find_context,
         );
     }
 };

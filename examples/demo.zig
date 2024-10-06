@@ -3,12 +3,20 @@ const Tree = @import("file-browser").Tree;
 const FileUtils = @import("file-browser").FileUtils;
 
 pub fn main() !void {
-    const allocator = std.heap.page_allocator;
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const deinit_status = gpa.deinit();
+        if (deinit_status == .leak) {
+            std.log.err("memory leak", .{});
+        }
+    }
+    const allocator = gpa.allocator();
 
     var tree = try Tree.init(allocator, ".");
     defer tree.deinit();
 
     try tree.loadTreeFromDir();
+    tree.traverseTree();
 
     const random_file_name = "main.zig";
     const found_item = try tree.findFirstMatchingName(random_file_name);
@@ -23,10 +31,17 @@ pub fn main() !void {
     const node_path = "insert/node/name.txt";
     try tree.insertNodeWithPath(node_path);
 
+    const substring = ".zig";
+    const matching_names = try tree.findAllContainingName(substring);
+    defer matching_names.deinit();
+
+    for (matching_names.items) |item| {
+        std.debug.print("Found matching substring: {s} with path:{s}\n", .{ substring, item });
+        allocator.free(item);
+    }
+
     const deleted_node = try tree.deleteNodeWithPath(FileUtils.getFirstNameFromPath(node_path));
     deleted_node.traverseNodeChildren(0);
     deleted_node.deinit();
     std.debug.print("Inserted and deleted node path: '{s}'\n", .{node_path});
-
-    tree.traverseTree();
 }

@@ -55,7 +55,6 @@ pub fn build(b: *std.Build) void {
     gui.root_module.addImport("vaxis", vaxis_dep.module("vaxis"));
     gui.root_module.addImport("file-browser", file_browser_mod);
 
-    // b.installArtifact(gui); // FIXME: change to b.addInstallArtifact(gui, .{}); as now installs to top-level build
     const gui_run = b.addRunArtifact(gui);
     gui_run.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
@@ -63,4 +62,7 @@ pub fn build(b: *std.Build) void {
     }
     const gui_step = b.step("gui", "Run GUI");
     gui_step.dependOn(&gui_run.step);
+
+    const gui_artifact = b.addInstallArtifact(gui, .{});
+    gui_artifact.step.dependOn(gui_step);
 }
