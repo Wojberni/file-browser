@@ -1,10 +1,10 @@
 const std = @import("std");
 const Tree = @import("file-browser").Tree;
-const TestFileStructure = @import("test_struct.zig").TestFileStructure;
-const FileUtils = @import("file-browser").FileUtils;
+const TestFileStructure = @import("TestFileStructure.zig");
+const fileUtils = @import("file-browser").fileUtils;
 
 const ALLOCATOR = std.testing.allocator;
-pub const TEST_DIR_NAME = "testing_dir";
+const TEST_DIR_NAME = "testing_dir";
 const NODE_NOT_FOUND = @import("file-browser").Node.SearchError.NotFound;
 
 test "check if test files are initialized correctly" {
@@ -43,7 +43,7 @@ test "check if first matching value can be found in tree" {
     try tree.loadTreeFromDir();
     const random_file_path = test_file_structure.getRandomFilePath();
 
-    const node_path = try tree.findFirstMatchingName(FileUtils.getLastNameFromPath(random_file_path));
+    const node_path = try tree.findFirstMatchingName(fileUtils.getLastNameFromPath(random_file_path));
     defer ALLOCATOR.free(node_path);
     const expected_path = try std.fmt.allocPrint(ALLOCATOR, "{s}/{s}", .{ test_file_structure.test_dir_name, random_file_path });
     defer ALLOCATOR.free(expected_path);
@@ -74,7 +74,7 @@ test "check if any values containing name are found in tree" {
 
     try tree.loadTreeFromDir();
     const random_file_path = test_file_structure.getRandomFilePath();
-    const names = try tree.findAllContainingName(FileUtils.getLastNameFromPath(random_file_path));
+    const names = try tree.findAllContainingName(fileUtils.getLastNameFromPath(random_file_path));
     defer names.deinit();
 
     try std.testing.expect(names.items.len > 0);
@@ -115,7 +115,7 @@ test "check if value is inserted into tree and found after" {
     const inserted_node = "some/thing/interesting.txt";
     try tree.insertNodeWithPath(inserted_node);
 
-    const node_path = try tree.findFirstMatchingName(FileUtils.getLastNameFromPath(inserted_node));
+    const node_path = try tree.findFirstMatchingName(fileUtils.getLastNameFromPath(inserted_node));
     defer ALLOCATOR.free(node_path);
     const expected_path = try std.fmt.allocPrint(ALLOCATOR, "{s}/{s}", .{ test_file_structure.test_dir_name, inserted_node });
     defer ALLOCATOR.free(expected_path);
@@ -136,7 +136,7 @@ test "check if value is deleted from tree" {
     const deleted_node = try tree.deleteNodeWithPath(random_file_path);
     defer deleted_node.deinit();
 
-    try std.testing.expectEqualStrings(FileUtils.getLastNameFromPath(random_file_path), deleted_node.value.name);
+    try std.testing.expectEqualStrings(fileUtils.getLastNameFromPath(random_file_path), deleted_node.value.name);
 }
 
 test "check if value cannot be deleted from tree" {

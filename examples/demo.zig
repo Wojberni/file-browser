@@ -1,6 +1,6 @@
 const std = @import("std");
 const Tree = @import("file-browser").Tree;
-const FileUtils = @import("file-browser").FileUtils;
+const fileUtils = @import("file-browser").fileUtils;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -40,7 +40,7 @@ pub fn main() !void {
         allocator.free(item);
     }
 
-    const deleted_node = try tree.deleteNodeWithPath(FileUtils.getFirstNameFromPath(node_path));
+    const deleted_node = try tree.deleteNodeWithPath(fileUtils.getFirstNameFromPath(node_path));
     deleted_node.traverseNodeChildren(0);
     deleted_node.deinit();
     std.debug.print("Inserted and deleted node path: '{s}'\n", .{node_path});
