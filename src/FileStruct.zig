@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const MAX_PATH = std.os.linux.PATH_MAX;
-
 const FileStruct = @This();
 
 /// supported types of file structure objects

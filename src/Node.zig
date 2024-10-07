@@ -2,8 +2,6 @@ const std = @import("std");
 const FileStruct = @import("FileStruct.zig");
 const fileUtils = @import("file_utils.zig");
 
-const MAX_PATH = std.os.linux.PATH_MAX;
-
 const Node = @This();
 
 value: FileStruct,
@@ -50,6 +48,8 @@ pub fn isChildless(self: *Node) bool {
     return true;
 }
 
+/// loads directory structure to the library tree structure
+/// NOTE: some file structures are not supported and will cause crashing the program!
 pub fn loadNodeChildren(self: *Node) !void {
     const root_dir = self.value.file_union.dir;
 
@@ -89,6 +89,10 @@ pub fn loadNodeChildren(self: *Node) !void {
     }
 }
 
+/// creates node and adds it to tree file structure on given path
+/// if no extension given it creates a directory, otherwise it will create a file
+/// returns error if file cannot be created
+/// IMPORTANT: Do use with care! This function operates on real files, so it will create new files!
 pub fn insertNodeWithPath(self: *Node, path: []const u8) !void {
     try fileUtils.createPathAndFile(self.allocator, self.value.file_union.dir, path);
     var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
@@ -114,6 +118,10 @@ pub fn insertNodeWithPath(self: *Node, path: []const u8) !void {
     }
 }
 
+/// given path removes passed node with children its contains
+/// returns found node or SearchError if node is not found
+/// NOTE: as nodde is removed only from arraylist, you MUST deinitialize it later
+/// IMPORTANT: Do use with care! This function operates on real files, so deleting with remove your files!
 pub fn deleteNodeWithPath(self: *Node, path: []const u8) !*Node {
     var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
     var node_iter = self;
@@ -130,6 +138,8 @@ pub fn deleteNodeWithPath(self: *Node, path: []const u8) !*Node {
     return parent.children.orderedRemove(try getChildIndex(parent, last_name));
 }
 
+/// checks if child node is found
+/// returns matching node or null if node is not found
 fn checkIfChildExists(self: *const Node, name: []const u8) ?*Node {
     for (self.children.items) |item| {
         if (std.mem.eql(u8, name, item.value.name)) {
@@ -139,6 +149,8 @@ fn checkIfChildExists(self: *const Node, name: []const u8) ?*Node {
     return null;
 }
 
+/// looks for a child in node items
+/// returns SearchError if no matching node found or current element index in items array
 fn getChildIndex(self: *const Node, name: []const u8) !usize {
     for (self.children.items, 0..) |item, index| {
         if (std.mem.eql(u8, name, item.value.name)) {
@@ -148,6 +160,9 @@ fn getChildIndex(self: *const Node, name: []const u8) !usize {
     return SearchError.NotFound;
 }
 
+/// find using BFS algorithm - Bread First Search
+/// returns a path to a first found matching node
+/// NOTE: as it returns string, don't forget to free it
 pub fn findFirstMatchingName(self: *Node, name: []const u8) ![]const u8 {
     var queue = std.ArrayList(*Node).init(self.allocator);
     defer queue.deinit();
@@ -165,6 +180,8 @@ pub fn findFirstMatchingName(self: *Node, name: []const u8) ![]const u8 {
     return SearchError.NotFound;
 }
 
+/// returns all nodes mathing passed substring
+/// NOTE: as it returns ArrayList, don't forget to free it
 pub fn findAllContainingName(self: *Node, name: []const u8) !std.ArrayList([]const u8) {
     var result = std.ArrayList([]const u8).init(self.allocator);
     if (name.len == 0) {
@@ -187,6 +204,8 @@ pub fn findAllContainingName(self: *Node, name: []const u8) !std.ArrayList([]con
     return result;
 }
 
+/// returns a path that you have to traverse to get from parent node to selected node
+/// NOTE: as it returns string, don't forget to free it
 pub fn getPathFromRoot(self: ?*const Node) ![]const u8 {
     var queue = std.ArrayList([]u8).init(self.?.allocator);
     defer queue.deinit();
@@ -199,6 +218,7 @@ pub fn getPathFromRoot(self: ?*const Node) ![]const u8 {
     return result;
 }
 
+/// prints all items in directory and subdirectories recursively
 pub fn traverseNodeChildren(self: *const Node, nested_level: u32) void {
     for (0..nested_level) |_| {
         std.debug.print("│   ", .{});
