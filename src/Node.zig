@@ -1,24 +1,31 @@
 const std = @import("std");
-const FileStruct = @import("FileStruct.zig");
+const NodeValue = @import("NodeValue.zig");
 const fileUtils = @import("file_utils.zig");
 
 const Node = @This();
 
-value: FileStruct,
+value: NodeValue,
 children: std.ArrayList(*Node),
 allocator: std.mem.Allocator,
 parent: ?*Node,
+cwd_dir: *std.fs.Dir,
 
 pub const SearchError = error{
     NotFound,
 };
 
-pub fn init(allocator: std.mem.Allocator, parent: ?*Node, value: FileStruct) !*Node {
+pub fn init(allocator: std.mem.Allocator, cwd_dir: *std.fs.Dir, parent: ?*Node, value: NodeValue) !*Node {
     var children = std.ArrayList(*Node).init(allocator);
     errdefer children.deinit();
     const node = try allocator.create(Node);
     errdefer allocator.destroy(node);
-    node.* = .{ .value = value, .children = children, .allocator = allocator, .parent = parent };
+    node.* = .{
+        .value = value,
+        .children = children,
+        .allocator = allocator,
+        .parent = parent,
+        .cwd_dir = cwd_dir,
+    };
     return node;
 }
 
@@ -28,16 +35,6 @@ pub fn deinit(self: *const Node) void {
     }
     self.children.deinit();
     self.allocator.free(self.value.name);
-    switch (self.value.file_union) {
-        .dir => |dir| {
-            var node_dir = dir;
-            node_dir.close();
-        },
-        .file => |file| {
-            var node_file = file;
-            node_file.close();
-        },
-    }
     self.allocator.destroy(self);
 }
 
@@ -51,9 +48,14 @@ pub fn isChildless(self: *Node) bool {
 /// loads directory structure to the library tree structure
 /// NOTE: some file structures are not supported and will cause crashing the program!
 pub fn loadNodeChildren(self: *Node) !void {
-    const root_dir = self.value.file_union.dir;
+    var cur_dir = try self.getDirOfNode();
+    defer {
+        if (self.parent) |_| {
+            cur_dir.close();
+        }
+    }
 
-    var iterator = root_dir.iterate();
+    var iterator = cur_dir.iterate();
     while (try iterator.next()) |entry| {
         switch (entry.kind) {
             std.fs.File.Kind.directory => {
@@ -61,13 +63,17 @@ pub fn loadNodeChildren(self: *Node) !void {
                     try node.loadNodeChildren();
                     continue;
                 }
-                var entry_dir = try root_dir.openDir(entry.name, .{ .iterate = true });
-                errdefer entry_dir.close();
+                var entry_dir = try cur_dir.openDir(entry.name, .{});
+                defer entry_dir.close();
                 const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
                 errdefer self.allocator.free(allocated_file_name);
 
-                const file_struct = FileStruct.init(allocated_file_name, .{ .dir = entry_dir });
-                const node = try Node.init(self.allocator, self, file_struct);
+                const value = NodeValue.init(allocated_file_name, .{
+                    .dir = .{
+                        .metadata = try entry_dir.metadata(),
+                    },
+                });
+                const node = try Node.init(self.allocator, self.cwd_dir, self, value);
                 try self.children.append(node);
                 try self.children.items[self.children.items.len - 1].loadNodeChildren();
             },
@@ -75,15 +81,22 @@ pub fn loadNodeChildren(self: *Node) !void {
                 if (self.checkIfChildExists(entry.name)) |_| {
                     continue;
                 }
-                var entry_file = try root_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_only });
-                errdefer entry_file.close();
+                var entry_file = try cur_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_only });
+                defer entry_file.close();
                 const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
                 errdefer self.allocator.free(allocated_file_name);
 
-                const file_struct = FileStruct.init(allocated_file_name, .{ .file = entry_file });
-                try self.children.append(try Node.init(self.allocator, self, file_struct));
+                const value = NodeValue.init(allocated_file_name, .{
+                    .file = .{
+                        .metadata = try entry_file.metadata(),
+                    },
+                });
+                try self.children.append(try Node.init(self.allocator, self.cwd_dir, self, value));
             },
-            else => unreachable,
+            else => {
+                std.debug.print("Found not supported type: {any}, name: {s}\n", .{ entry.kind, entry.name });
+                unreachable;
+            },
             // TODO: add std.fs.File.Kind.sym_link support?
         }
     }
@@ -94,7 +107,14 @@ pub fn loadNodeChildren(self: *Node) !void {
 /// returns error if file cannot be created
 /// IMPORTANT: Do use with care! This function operates on real files, so it will create new files!
 pub fn insertNodeWithPath(self: *Node, path: []const u8) !void {
-    try fileUtils.createPathAndFile(self.allocator, self.value.file_union.dir, path);
+    var cur_dir = try self.getDirOfNode();
+    defer {
+        if (self.parent) |_| {
+            cur_dir.close();
+        }
+    }
+
+    try fileUtils.createPathAndFile(self.allocator, cur_dir, path);
     var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
     var node_iter = self;
     while (path_items_iterator.next()) |path_item| {
@@ -104,15 +124,30 @@ pub fn insertNodeWithPath(self: *Node, path: []const u8) !void {
         }
         const allocated_name = try std.fmt.allocPrint(self.allocator, "{s}", .{path_item});
         errdefer self.allocator.free(allocated_name);
-        var file_struct: FileStruct = undefined;
+        var file_struct: NodeValue = undefined;
+        var iter_dir = try node_iter.getDirOfNode();
+
         if (std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
-            const dir = try node_iter.value.file_union.dir.openDir(path_item, .{ .iterate = true });
-            file_struct = FileStruct.init(allocated_name, .{ .dir = dir });
+            const dir = try iter_dir.openDir(path_item, .{});
+            file_struct = NodeValue.init(allocated_name, .{
+                .dir = .{
+                    .metadata = try dir.metadata(),
+                },
+            });
         } else {
-            const file = try node_iter.value.file_union.dir.openFile(path_item, .{ .mode = std.fs.File.OpenMode.read_only });
-            file_struct = FileStruct.init(allocated_name, .{ .file = file });
+            const file = try iter_dir.openFile(path_item, .{ .mode = std.fs.File.OpenMode.read_only });
+            file_struct = NodeValue.init(allocated_name, .{
+                .file = .{
+                    .metadata = try file.metadata(),
+                },
+            });
         }
-        const node = try Node.init(self.allocator, node_iter, file_struct);
+
+        if (node_iter.parent) |_| {
+            iter_dir.close();
+        }
+
+        const node = try Node.init(self.allocator, self.cwd_dir, node_iter, file_struct);
         try node_iter.children.append(node);
         node_iter = node_iter.children.items[node_iter.children.items.len - 1];
     }
@@ -120,7 +155,7 @@ pub fn insertNodeWithPath(self: *Node, path: []const u8) !void {
 
 /// given path removes passed node with children its contains
 /// returns found node or SearchError if node is not found
-/// NOTE: as nodde is removed only from arraylist, you MUST deinitialize it later
+/// NOTE: as node is removed only from arraylist, you MUST deinitialize it later
 /// IMPORTANT: Do use with care! This function operates on real files, so deleting with remove your files!
 pub fn deleteNodeWithPath(self: *Node, path: []const u8) !*Node {
     var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
@@ -134,7 +169,13 @@ pub fn deleteNodeWithPath(self: *Node, path: []const u8) !*Node {
     }
     const parent = node_iter.parent.?;
     const last_name = fileUtils.getLastNameFromPath(path);
-    try fileUtils.deleteDirOrFileFromDir(parent.value.file_union.dir, last_name);
+    var parent_dir = try parent.getDirOfNode();
+    defer {
+        if (parent.parent) |_| {
+            parent_dir.close();
+        }
+    }
+    try fileUtils.deleteDirOrFileFromDir(parent_dir, last_name);
     return parent.children.orderedRemove(try getChildIndex(parent, last_name));
 }
 
@@ -214,8 +255,20 @@ pub fn getPathFromRoot(self: ?*const Node) ![]const u8 {
     while (iterator != null) : (iterator = iterator.?.parent) {
         try queue.insert(0, iterator.?.value.name);
     }
-    const result = try fileUtils.joinArraylistToPath(self.?.allocator, &queue);
-    return result;
+    return try fileUtils.joinArraylistToPath(self.?.allocator, &queue);
+}
+
+/// returns a path without root directory, used for Dir struct creation
+/// NOTE: as it returns string, don't forget to free it
+fn getPathWithoutRoot(self: ?*const Node) ![]const u8 {
+    var queue = std.ArrayList([]u8).init(self.?.allocator);
+    defer queue.deinit();
+
+    var iterator = self;
+    while (iterator.?.parent != null) : (iterator = iterator.?.parent) {
+        try queue.insert(0, iterator.?.value.name);
+    }
+    return try fileUtils.joinArraylistToPath(self.?.allocator, &queue);
 }
 
 /// prints all items in directory and subdirectories recursively
@@ -225,7 +278,7 @@ pub fn traverseNodeChildren(self: *const Node, nested_level: u32) void {
     }
     std.debug.print("├── {s}\n", .{self.value.name});
     for (self.children.items) |child| {
-        switch (child.value.file_union) {
+        switch (child.value.file_type) {
             .dir => {
                 child.traverseNodeChildren(nested_level + 1);
             },
@@ -236,5 +289,21 @@ pub fn traverseNodeChildren(self: *const Node, nested_level: u32) void {
                 std.debug.print("├── {s}\n", .{child.value.name});
             },
         }
+    }
+}
+
+/// returns struct containing file descriptor of Dir
+/// NOTE: do not forget to close it
+fn getDirOfNode(self: ?*const Node) !std.fs.Dir {
+    switch (self.?.value.file_type) {
+        .dir => {
+            const full_path = try self.?.getPathWithoutRoot();
+            defer self.?.allocator.free(full_path);
+            if (full_path.len == 0) {
+                return self.?.cwd_dir.*;
+            }
+            return try self.?.cwd_dir.openDir(full_path, .{ .iterate = true });
+        },
+        else => return undefined,
     }
 }

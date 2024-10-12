@@ -62,7 +62,10 @@ pub fn build(b: *std.Build) void {
     }
     const gui_step = b.step("gui", "Run GUI");
     gui_step.dependOn(&gui_run.step);
-
+    
+    // zig build gui-artifact
     const gui_artifact = b.addInstallArtifact(gui, .{});
-    gui_artifact.step.dependOn(gui_step);
+    gui_artifact.step.dependOn(b.getInstallStep());
+    const gui_artifact_step = b.step("gui-artifact", "Generate GUI artifact");
+    gui_artifact_step.dependOn(&gui_artifact.step);
 }

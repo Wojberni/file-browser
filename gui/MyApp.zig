@@ -2,7 +2,7 @@ const std = @import("std");
 const vaxis = @import("vaxis");
 const Tree = @import("file-browser").Tree;
 const Node = @import("file-browser").Node;
-const FileStruct = @import("file-browser").FileStruct;
+const NodeValue = @import("file-browser").NodeValue;
 
 const MyApp = @This();
 
@@ -125,7 +125,7 @@ fn updateTable(self: *MyApp, event: Event) !void {
             if (key.matchesAny(&.{ vaxis.Key.down, 'j' }, .{}) and !self.current_node.isChildless())
                 self.main_context.row +|= 1;
             if (key.matches(vaxis.Key.enter, .{}) and !self.current_node.isChildless()) {
-                const selected_item_type = self.current_node.children.items[self.main_context.row].value.file_union;
+                const selected_item_type = self.current_node.children.items[self.main_context.row].value.file_type;
                 const selected_dir = switch (selected_item_type) {
                     .dir => true,
                     .file => false,
@@ -349,11 +349,14 @@ fn drawMiddleTable(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !voi
     defer list.deinit();
     for (self.current_node.children.items) |child| {
         var file_type: []const u8 = undefined;
-        switch (child.value.file_union) {
-            FileStruct.FileUnion.file => file_type = "File",
-            FileStruct.FileUnion.dir => file_type = "Directory",
+        switch (child.value.file_type) {
+            NodeValue.FileType.file => file_type = "File",
+            NodeValue.FileType.dir => file_type = "Directory",
         }
-        try list.append(.{ .name = child.value.name, .type = file_type });
+        try list.append(.{
+            .name = child.value.name,
+            .type = file_type,
+        });
     }
 
     try vaxis.widgets.Table.drawTable(

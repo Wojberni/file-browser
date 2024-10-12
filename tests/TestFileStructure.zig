@@ -9,8 +9,6 @@ test_dir: std.fs.Dir,
 test_dir_name: []const u8,
 allocator: std.mem.Allocator,
 
-const InitTestDirError = error{CannotBeCurrentDir};
-
 pub fn init(allocator: std.mem.Allocator, test_dir_name: []const u8) !TestFileStructure {
     var test_file_structure = TestFileStructure{
         .allocator = allocator,
@@ -58,7 +56,7 @@ fn initFilePaths(self: *TestFileStructure) !void {
 
 fn initTestDir(self: *TestFileStructure) !void {
     if (std.mem.eql(u8, self.test_dir_name, ".")) {
-        return InitTestDirError.CannotBeCurrentDir;
+        return error.CannotBeCurrentDir;
     }
 
     self.root_dir = try std.fs.cwd().openDir(".", .{});

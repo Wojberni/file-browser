@@ -1,15 +1,17 @@
 const std = @import("std");
 const Node = @import("Node.zig");
-const FileStruct = @import("FileStruct.zig");
+const NodeValue = @import("NodeValue.zig");
 
 const Tree = @This();
 
+allocator: std.mem.Allocator,
 root: *Node,
+root_dir: *std.fs.Dir,
 
 pub fn init(allocator: std.mem.Allocator, root_dir_name: []const u8) !Tree {
-    var current_dir = try std.fs.cwd().openDir(root_dir_name, .{ .iterate = true });
-    errdefer current_dir.close();
-    const current_path = try current_dir.realpathAlloc(allocator, ".");
+    var cwd_dir = try std.fs.cwd().openDir(root_dir_name, .{ .iterate = true });
+
+    const current_path = try cwd_dir.realpathAlloc(allocator, ".");
     defer allocator.free(current_path);
     const current_dir_name = std.fs.path.basename(current_path);
 
@@ -17,12 +19,20 @@ pub fn init(allocator: std.mem.Allocator, root_dir_name: []const u8) !Tree {
     errdefer allocator.free(allocated_file_name);
     std.mem.copyForwards(u8, allocated_file_name, current_dir_name);
 
-    const file_struct = FileStruct.init(allocated_file_name, .{ .dir = current_dir });
-    return .{ .root = try Node.init(allocator, null, file_struct) };
+    const value = NodeValue.init(allocated_file_name, .{ .dir = .{ .metadata = try cwd_dir.metadata() } });
+    const root_dir_ptr = try allocator.create(std.fs.Dir);
+    root_dir_ptr.* = cwd_dir;
+    return .{
+        .allocator = allocator,
+        .root = try Node.init(allocator, root_dir_ptr, null, value),
+        .root_dir = root_dir_ptr,
+    };
 }
 
 pub fn deinit(self: *Tree) void {
     self.root.deinit();
+    self.root_dir.close();
+    self.allocator.destroy(self.root_dir);
 }
 
 pub fn traverseTree(self: *Tree) void {

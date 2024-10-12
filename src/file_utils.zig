@@ -2,7 +2,7 @@ const std = @import("std");
 
 const MAX_PATH = std.os.linux.PATH_MAX;
 
-pub fn createPathAndFile(allocator: std.mem.Allocator, root_dir: std.fs.Dir, entry: []const u8) !void {
+pub fn createPathAndFile(allocator: std.mem.Allocator, root_dir: std.fs.Dir, path: []const u8) !void {
     var full_item_path: []u8 = try allocator.alloc(u8, 0);
     defer allocator.free(full_item_path);
     var full_item_name: []u8 = try allocator.alloc(u8, 0);
@@ -11,7 +11,7 @@ pub fn createPathAndFile(allocator: std.mem.Allocator, root_dir: std.fs.Dir, ent
     var ring_buffer = try std.RingBuffer.init(allocator, MAX_PATH);
     defer ring_buffer.deinit(allocator);
 
-    var path_items_iterator = std.mem.tokenizeSequence(u8, entry, "/");
+    var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
     while (path_items_iterator.next()) |path_item| {
         if (std.mem.eql(u8, std.fs.path.extension(path_item), "")) {
             try ring_buffer.writeSlice(path_item);
@@ -39,11 +39,11 @@ pub fn createPathAndFile(allocator: std.mem.Allocator, root_dir: std.fs.Dir, ent
     }
 }
 
-pub fn deleteDirOrFileFromDir(root_dir: std.fs.Dir, entry: []const u8) !void {
-    if (std.mem.eql(u8, std.fs.path.extension(entry), "")) {
-        try root_dir.deleteTree(entry);
+pub fn deleteDirOrFileFromDir(root_dir: std.fs.Dir, path: []const u8) !void {
+    if (std.mem.eql(u8, std.fs.path.extension(path), "")) {
+        try root_dir.deleteTree(path);
     } else {
-        try root_dir.deleteFile(entry);
+        try root_dir.deleteFile(path);
     }
 }
 
