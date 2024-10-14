@@ -13,13 +13,19 @@ pub fn init(allocator: std.mem.Allocator, root_dir_name: []const u8) !Tree {
 
     const current_path = try cwd_dir.realpathAlloc(allocator, ".");
     defer allocator.free(current_path);
+
     const current_dir_name = std.fs.path.basename(current_path);
-
-    const allocated_file_name = try allocator.alloc(u8, current_dir_name.len);
+    const allocated_file_name = try allocator.dupe(u8, current_dir_name);
     errdefer allocator.free(allocated_file_name);
-    std.mem.copyForwards(u8, allocated_file_name, current_dir_name);
 
-    const value = NodeValue.init(allocated_file_name, .{ .dir = .{ .metadata = try cwd_dir.metadata() } });
+    const value = NodeValue.init(
+        allocated_file_name,
+        .{
+            .dir = .{
+                .metadata = try cwd_dir.metadata(),
+            },
+        },
+    );
     const root_dir_ptr = try allocator.create(std.fs.Dir);
     root_dir_ptr.* = cwd_dir;
     return .{

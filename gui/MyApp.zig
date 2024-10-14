@@ -128,7 +128,7 @@ fn updateTable(self: *MyApp, event: Event) !void {
                 const selected_item_type = self.current_node.children.items[self.main_context.row].value.file_type;
                 const selected_dir = switch (selected_item_type) {
                     .dir => true,
-                    .file => false,
+                    .file, .sym_link => false,
                 };
                 if (selected_dir) {
                     self.current_node = self.current_node.children.items[self.main_context.row];
@@ -352,6 +352,7 @@ fn drawMiddleTable(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !voi
         switch (child.value.file_type) {
             NodeValue.FileType.file => file_type = "File",
             NodeValue.FileType.dir => file_type = "Directory",
+            NodeValue.FileType.sym_link => file_type = "Symbolic Link",
         }
         try list.append(.{
             .name = child.value.name,

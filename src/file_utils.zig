@@ -17,7 +17,7 @@ pub fn createPathAndFile(allocator: std.mem.Allocator, root_dir: std.fs.Dir, pat
             try ring_buffer.writeSlice(path_item);
             try ring_buffer.writeSlice("/");
         } else {
-            full_item_name = try std.fmt.allocPrint(allocator, "{s}", .{path_item});
+            full_item_name = try allocator.dupe(u8, path_item);
         }
     }
 

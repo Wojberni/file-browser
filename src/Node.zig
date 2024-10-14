@@ -34,7 +34,7 @@ pub fn deinit(self: *const Node) void {
         child.deinit();
     }
     self.children.deinit();
-    self.allocator.free(self.value.name);
+    self.value.deinit(self.allocator);
     self.allocator.destroy(self);
 }
 
@@ -65,7 +65,7 @@ pub fn loadNodeChildren(self: *Node) !void {
                 }
                 var entry_dir = try cur_dir.openDir(entry.name, .{});
                 defer entry_dir.close();
-                const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
+                const allocated_file_name = try self.allocator.dupe(u8, entry.name);
                 errdefer self.allocator.free(allocated_file_name);
 
                 const value = NodeValue.init(allocated_file_name, .{
@@ -83,7 +83,7 @@ pub fn loadNodeChildren(self: *Node) !void {
                 }
                 var entry_file = try cur_dir.openFile(entry.name, .{ .mode = std.fs.File.OpenMode.read_only });
                 defer entry_file.close();
-                const allocated_file_name = try std.fmt.allocPrint(self.allocator, "{s}", .{entry.name});
+                const allocated_file_name = try self.allocator.dupe(u8, entry.name);
                 errdefer self.allocator.free(allocated_file_name);
 
                 const value = NodeValue.init(allocated_file_name, .{
@@ -93,11 +93,31 @@ pub fn loadNodeChildren(self: *Node) !void {
                 });
                 try self.children.append(try Node.init(self.allocator, self.cwd_dir, self, value));
             },
+            std.fs.File.Kind.sym_link => {
+                if (self.checkIfChildExists(entry.name)) |_| {
+                    continue;
+                }
+                const buffer: []u8 = try self.allocator.alloc(u8, 1024);
+                defer self.allocator.free(buffer);
+                const target = try cur_dir.readLink(entry.name, buffer);
+
+                const allocated_target = try self.allocator.dupe(u8, target);
+                errdefer self.allocator.free(allocated_target);
+
+                const allocated_file_name = try self.allocator.dupe(u8, entry.name);
+                errdefer self.allocator.free(allocated_file_name);
+
+                const value = NodeValue.init(allocated_file_name, .{
+                    .sym_link = .{
+                        .target = allocated_target,
+                    },
+                });
+                try self.children.append(try Node.init(self.allocator, self.cwd_dir, self, value));
+            },
             else => {
                 std.debug.print("Found not supported type: {any}, name: {s}\n", .{ entry.kind, entry.name });
                 unreachable;
             },
-            // TODO: add std.fs.File.Kind.sym_link support?
         }
     }
 }
@@ -122,7 +142,7 @@ pub fn insertNodeWithPath(self: *Node, path: []const u8) !void {
             node_iter = node;
             continue;
         }
-        const allocated_name = try std.fmt.allocPrint(self.allocator, "{s}", .{path_item});
+        const allocated_name = try self.allocator.dupe(u8, path_item);
         errdefer self.allocator.free(allocated_name);
         var file_struct: NodeValue = undefined;
         var iter_dir = try node_iter.getDirOfNode();
@@ -282,7 +302,7 @@ pub fn traverseNodeChildren(self: *const Node, nested_level: u32) void {
             .dir => {
                 child.traverseNodeChildren(nested_level + 1);
             },
-            .file => {
+            .file, .sym_link => {
                 for (0..nested_level + 1) |_| {
                     std.debug.print("│   ", .{});
                 }
