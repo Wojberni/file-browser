@@ -2,16 +2,15 @@ const std = @import("std");
 
 const NodeValue = @This();
 
-/// name of the file structure object
 name: []u8,
-/// type of the file structure object
 file_type: FileType,
 
-/// supported types of file structure objects
+/// Supported types of file structure objects.
 pub const FileType = union(enum) {
     dir: DirStruct,
     file: FileStruct,
     sym_link: SymLinkStruct,
+    other: OtherStruct,
 
     pub const DirStruct = struct {
         metadata: std.fs.File.Metadata,
@@ -21,6 +20,27 @@ pub const FileType = union(enum) {
     };
     pub const SymLinkStruct = struct {
         target: []u8,
+    };
+    pub const OtherStruct = struct {
+        type: std.fs.File.Kind,
+
+        /// Returns name for other custom types mapped from std.fs.File.Kind.
+        pub fn getTypeName(self: *const OtherStruct) []const u8 {
+            const other_types = [_][]const u8{
+                "Block Device",
+                "Characted Device",
+                "Directory",
+                "Named Pipe",
+                "Symbolic Link",
+                "File",
+                "UNIX Socket",
+                "Whiteout",
+                "Door",
+                "Event Port",
+                "Unknown",
+            };
+            return other_types[@intFromEnum(self.type)];
+        }
     };
 };
 

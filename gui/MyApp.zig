@@ -4,28 +4,47 @@ const Tree = @import("file-browser").Tree;
 const Node = @import("file-browser").Node;
 const NodeValue = @import("file-browser").NodeValue;
 
-const MyApp = @This();
+const MyGui = @This();
 
+/// Necessary for search functionality ArrayList
 const FindName = struct {
     name: []const u8,
 };
 
 allocator: std.mem.Allocator,
 should_quit: bool,
+/// Vaxis library TTY
 tty: vaxis.Tty,
+/// Vaxis library main struct
 vx: vaxis.Vaxis,
+/// Tree structure loaded from root directory.
 tree: Tree,
+/// Current location in a tree structure.
 current_node: *Node,
+/// Used for browsing files. When active, no dialogs will be seen on screen.
 main_context: vaxis.widgets.Table.TableContext,
+/// Used for moving around found items Table.
 find_context: vaxis.widgets.Table.TableContext,
+/// Type of dialog with action when main_context is not active.
 dialog: TypeDialog = undefined,
+/// Input used for search functionality.
 text_input: vaxis.widgets.TextInput = undefined,
+/// ArrayList of items found in search functionality
 find_arraylist: std.ArrayList(FindName),
 
-const Event = union(enum) { key_press: vaxis.Key, winsize: vaxis.Winsize };
-const TypeDialog = enum { delete, create, find };
+/// Events handled in event loop.
+const Event = union(enum) {
+    key_press: vaxis.Key,
+    winsize: vaxis.Winsize,
+};
 
-pub fn init(allocator: std.mem.Allocator) !MyApp {
+const TypeDialog = enum {
+    delete,
+    create,
+    find,
+};
+
+pub fn init(allocator: std.mem.Allocator) !MyGui {
     var tree = try Tree.init(allocator, ".");
     errdefer tree.deinit();
     try tree.loadTreeFromDir();
@@ -51,14 +70,15 @@ pub fn init(allocator: std.mem.Allocator) !MyApp {
     };
 }
 
-pub fn deinit(self: *MyApp) void {
+pub fn deinit(self: *MyGui) void {
     self.vx.deinit(self.allocator, self.tty.anyWriter());
     self.tty.deinit();
     self.tree.deinit();
     self.find_arraylist.deinit();
 }
 
-pub fn run(self: *MyApp) !void {
+/// Start the GUI applicaton
+pub fn run(self: *MyGui) !void {
     var loop: vaxis.Loop(Event) = .{ .tty = &self.tty, .vaxis = &self.vx };
     try loop.init();
 
@@ -97,7 +117,8 @@ pub fn run(self: *MyApp) !void {
     }
 }
 
-fn update(self: *MyApp, event: Event, curr_dir: []const u8) !void {
+/// Handles event caught in the event loop.
+fn update(self: *MyGui, event: Event, curr_dir: []const u8) !void {
     if (self.main_context.active) {
         try self.updateTable(event);
     } else {
@@ -115,7 +136,8 @@ fn update(self: *MyApp, event: Event, curr_dir: []const u8) !void {
     }
 }
 
-fn updateTable(self: *MyApp, event: Event) !void {
+/// Updates main table containing browsed files and directories based on event.
+fn updateTable(self: *MyGui, event: Event) !void {
     switch (event) {
         .key_press => |key| {
             if (key.matches('c', .{ .ctrl = true }))
@@ -128,7 +150,7 @@ fn updateTable(self: *MyApp, event: Event) !void {
                 const selected_item_type = self.current_node.children.items[self.main_context.row].value.file_type;
                 const selected_dir = switch (selected_item_type) {
                     .dir => true,
-                    .file, .sym_link => false,
+                    else => false,
                 };
                 if (selected_dir) {
                     self.current_node = self.current_node.children.items[self.main_context.row];
@@ -157,7 +179,8 @@ fn updateTable(self: *MyApp, event: Event) !void {
     }
 }
 
-fn updateDeleteDialog(self: *MyApp, event: Event, curr_dir: []const u8) !void {
+/// Updates delete dialog based on event.
+fn updateDeleteDialog(self: *MyGui, event: Event, curr_dir: []const u8) !void {
     switch (event) {
         .key_press => |key| {
             if (key.matches('c', .{ .ctrl = true }))
@@ -170,7 +193,11 @@ fn updateDeleteDialog(self: *MyApp, event: Event, curr_dir: []const u8) !void {
                 const curr_dir_end_index = std.mem.indexOf(u8, curr_dir, end_delimit);
                 if (curr_dir_end_index) |end_index| {
                     const path_begin_index = end_index + end_delimit.len;
-                    const deleted = try std.fmt.allocPrint(self.allocator, "{s}{s}{s}", .{ curr_dir[path_begin_index..], end_delimit, selected });
+                    const deleted = try std.fmt.allocPrint(self.allocator, "{s}{s}{s}", .{
+                        curr_dir[path_begin_index..],
+                        end_delimit,
+                        selected,
+                    });
                     defer self.allocator.free(deleted);
                     const deleted_node = try self.tree.deleteNodeWithPath(deleted);
                     defer deleted_node.deinit();
@@ -188,7 +215,8 @@ fn updateDeleteDialog(self: *MyApp, event: Event, curr_dir: []const u8) !void {
     }
 }
 
-fn updateCreateDialog(self: *MyApp, event: Event, curr_dir: []const u8) !void {
+/// Updates create dialog based on event.
+fn updateCreateDialog(self: *MyGui, event: Event, curr_dir: []const u8) !void {
     switch (event) {
         .key_press => |key| {
             if (key.matches('c', .{ .ctrl = true })) {
@@ -204,7 +232,11 @@ fn updateCreateDialog(self: *MyApp, event: Event, curr_dir: []const u8) !void {
                 const curr_dir_end_index = std.mem.indexOf(u8, curr_dir, end_delimit);
                 if (curr_dir_end_index) |end_index| {
                     const path_begin_index = end_index + end_delimit.len;
-                    const inserted = try std.fmt.allocPrint(self.allocator, "{s}{s}{s}", .{ curr_dir[path_begin_index..], end_delimit, new_file_name });
+                    const inserted = try std.fmt.allocPrint(self.allocator, "{s}{s}{s}", .{
+                        curr_dir[path_begin_index..],
+                        end_delimit,
+                        new_file_name,
+                    });
                     defer self.allocator.free(inserted);
                     try self.tree.insertNodeWithPath(inserted);
                 } else {
@@ -223,7 +255,8 @@ fn updateCreateDialog(self: *MyApp, event: Event, curr_dir: []const u8) !void {
     }
 }
 
-fn updateFindTable(self: *MyApp, event: Event) !void {
+/// Updates table with found items based on event.
+fn updateFindTable(self: *MyGui, event: Event) !void {
     switch (event) {
         .key_press => |key| {
             if (key.matches('c', .{ .ctrl = true })) {
@@ -255,7 +288,10 @@ fn updateFindTable(self: *MyApp, event: Event) !void {
     }
 }
 
-fn draw(self: *MyApp, curr_dir: []const u8) !void {
+/// Draws current app state to the terminal screen.
+///
+/// IMPORTANT: App will crash if less than 90 width and 30 height.
+fn draw(self: *MyGui, curr_dir: []const u8) !void {
     var win = self.vx.window();
     win.clear();
     win.hideCursor();
@@ -280,6 +316,7 @@ fn draw(self: *MyApp, curr_dir: []const u8) !void {
     }
 }
 
+/// Draws top bar containing key bindings info.
 fn drawTopBar(win: *vaxis.Window, curr_dir: []const u8, top_bar_height: usize) !void {
     const logo_text =
         \\      _______ __           __
@@ -317,20 +354,32 @@ fn drawTopBar(win: *vaxis.Window, curr_dir: []const u8, top_bar_height: usize) !
         .style = .{ .bold = true, .italic = true, .fg = .{ .rgb = .{ 200, 50, 50 } } },
     };
 
-    var segment_array = [_]vaxis.Cell.Segment{ logo_segment, tutor_segment, curr_dir_text_segment, curr_dir_segment };
+    var segment_array = [_]vaxis.Cell.Segment{
+        logo_segment,
+        tutor_segment,
+        curr_dir_text_segment,
+        curr_dir_segment,
+    };
 
     const top_bar = win.child(.{
         .height = .{ .limit = top_bar_height },
         .border = .{
             .where = .all,
-            .glyphs = .{ .custom = .{ "#", "#", "#", "#", "#", "#" } },
-            .style = .{ .fg = .{ .rgb = .{ 64, 128, 255 } } },
+            .glyphs = .{
+                .custom = .{ "#", "#", "#", "#", "#", "#" },
+            },
+            .style = .{
+                .fg = .{
+                    .rgb = .{ 64, 128, 255 },
+                },
+            },
         },
     });
     _ = try top_bar.print(segment_array[0..], .{});
 }
 
-fn drawMiddleTable(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !void {
+/// Draws Table containing all browsed files and directories.
+fn drawMiddleTable(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !void {
     var event_arena = std.heap.ArenaAllocator.init(self.allocator);
     defer event_arena.deinit();
     const event_alloc = event_arena.allocator();
@@ -353,6 +402,7 @@ fn drawMiddleTable(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !voi
             NodeValue.FileType.file => file_type = "File",
             NodeValue.FileType.dir => file_type = "Directory",
             NodeValue.FileType.sym_link => file_type = "Symbolic Link",
+            NodeValue.FileType.other => |other_type| file_type = other_type.getTypeName(),
         }
         try list.append(.{
             .name = child.value.name,
@@ -369,6 +419,7 @@ fn drawMiddleTable(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !voi
     );
 }
 
+/// Draws delete dialog.
 fn drawDeleteDialog(win: *vaxis.Window, top_bar_height: usize) !void {
     const dialog_text = "Are you sure you want to delete this file/folder?\nPress y/n to confirm/decline";
     const borders = 2;
@@ -393,7 +444,8 @@ fn drawDeleteDialog(win: *vaxis.Window, top_bar_height: usize) !void {
     _ = try dialog_bar.print(segment_array[0..], .{});
 }
 
-fn drawCreateDialog(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !void {
+/// Draws create dialog.
+fn drawCreateDialog(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !void {
     const dialog_text = "(Optionally enter a path with subdirectories to be created for a file)\nEnter a file name to create:";
     const borders = 2;
     const max_width = "(Optionally enter a path with subdirectories to be created for a file)\n".len + borders;
@@ -427,7 +479,8 @@ fn drawCreateDialog(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !vo
     self.text_input.draw(child);
 }
 
-fn drawFindTable(self: *MyApp, win: *vaxis.Window, top_bar_height: usize) !void {
+/// Draws Table with found elements from on input text field
+fn drawFindTable(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !void {
     const input_height = 1;
     const borders = 2;
     const child = win.child(.{

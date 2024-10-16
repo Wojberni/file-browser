@@ -2,6 +2,9 @@ const std = @import("std");
 
 const MAX_PATH = std.os.linux.PATH_MAX;
 
+/// Creates a file and subdirectories if passed in path.
+///
+/// NOTE: It might bug out for hidden files due to std.fs.path.extension implementation.
 pub fn createPathAndFile(allocator: std.mem.Allocator, root_dir: std.fs.Dir, path: []const u8) !void {
     var full_item_path: []u8 = try allocator.alloc(u8, 0);
     defer allocator.free(full_item_path);
@@ -39,6 +42,7 @@ pub fn createPathAndFile(allocator: std.mem.Allocator, root_dir: std.fs.Dir, pat
     }
 }
 
+/// Deletes all files from given path.
 pub fn deleteDirOrFileFromDir(root_dir: std.fs.Dir, path: []const u8) !void {
     if (std.mem.eql(u8, std.fs.path.extension(path), "")) {
         try root_dir.deleteTree(path);
@@ -47,6 +51,7 @@ pub fn deleteDirOrFileFromDir(root_dir: std.fs.Dir, path: []const u8) !void {
     }
 }
 
+/// Given string ArrayList returns concatenated path with '/'.
 pub fn joinArraylistToPath(allocator: std.mem.Allocator, arraylist: *std.ArrayList([]u8)) ![]const u8 {
     var ring_buffer = try std.RingBuffer.init(allocator, MAX_PATH);
     defer ring_buffer.deinit(allocator);
@@ -63,16 +68,7 @@ pub fn joinArraylistToPath(allocator: std.mem.Allocator, arraylist: *std.ArrayLi
     return path;
 }
 
-pub fn getLastNameFromPath(path: []const u8) []const u8 {
-    var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
-    while (path_items_iterator.next()) |path_item| {
-        if (path_items_iterator.peek() == null) {
-            return path_item;
-        }
-    }
-    return "";
-}
-
+/// Returns root dir name, useful from relative path.
 pub fn getFirstNameFromPath(path: []const u8) []const u8 {
     var path_items_iterator = std.mem.tokenizeSequence(u8, path, "/");
     if (path_items_iterator.next()) |first_item| {
