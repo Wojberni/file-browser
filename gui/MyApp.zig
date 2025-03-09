@@ -57,13 +57,21 @@ pub fn init(allocator: std.mem.Allocator) !MyGui {
         .tree = tree,
         .current_node = tree.root,
         .main_context = .{
+            .active_bg = .{ .rgb = .{ 71, 123, 250 } },
             .selected_bg = .{
                 .rgb = .{ 64, 128, 255 },
             },
+            .header_names = .{
+                .custom = &.{ "Name", "Type" },
+            },
         },
         .find_context = .{
+            .active_bg = .{ .rgb = .{ 71, 123, 250 } },
             .selected_bg = .{
                 .rgb = .{ 64, 128, 255 },
+            },
+            .header_names = .{
+                .custom = &.{"Name"},
             },
         },
         .find_arraylist = std.ArrayList(FindName).init(allocator),
@@ -413,7 +421,6 @@ fn drawMiddleTable(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !voi
     try vaxis.widgets.Table.drawTable(
         event_alloc,
         middle_bar,
-        &.{ "Name", "Type" },
         list,
         &self.main_context,
     );
@@ -506,7 +513,7 @@ fn drawFindTable(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !void 
         },
     });
 
-    const searched_item = self.text_input.buf.items[0..self.text_input.buf.items.len];
+    const searched_item = self.text_input.buf.buffer[0..self.text_input.buf.realLength()];
     const search_result = try self.tree.findAllContainingName(searched_item);
     defer search_result.deinit();
     for (search_result.items) |item| {
@@ -516,7 +523,6 @@ fn drawFindTable(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !void 
     try vaxis.widgets.Table.drawTable(
         event_alloc,
         middle_bar,
-        &.{"Name"},
         self.find_arraylist,
         &self.find_context,
     );
