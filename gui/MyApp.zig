@@ -304,7 +304,7 @@ fn draw(self: *MyGui, curr_dir: []const u8) !void {
     win.clear();
     win.hideCursor();
 
-    const top_bar_height: usize = 15;
+    const top_bar_height: u16 = 15;
 
     if (win.width < 90)
         return error.NotEnoughTerminalWidth;
@@ -325,7 +325,7 @@ fn draw(self: *MyGui, curr_dir: []const u8) !void {
 }
 
 /// Draws top bar containing key bindings info.
-fn drawTopBar(win: *vaxis.Window, curr_dir: []const u8, top_bar_height: usize) !void {
+fn drawTopBar(win: *vaxis.Window, curr_dir: []const u8, top_bar_height: u16) !void {
     const logo_text =
         \\      _______ __           __
         \\     / ____(_/ ___        / /_  _________ _      __________  _____
@@ -370,7 +370,7 @@ fn drawTopBar(win: *vaxis.Window, curr_dir: []const u8, top_bar_height: usize) !
     };
 
     const top_bar = win.child(.{
-        .height = .{ .limit = top_bar_height },
+        .height = top_bar_height,
         .border = .{
             .where = .all,
             .glyphs = .{
@@ -383,11 +383,11 @@ fn drawTopBar(win: *vaxis.Window, curr_dir: []const u8, top_bar_height: usize) !
             },
         },
     });
-    _ = try top_bar.print(segment_array[0..], .{});
+    _ = top_bar.print(segment_array[0..], .{});
 }
 
 /// Draws Table containing all browsed files and directories.
-fn drawMiddleTable(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !void {
+fn drawMiddleTable(self: *MyGui, win: *vaxis.Window, top_bar_height: u16) !void {
     var event_arena = std.heap.ArenaAllocator.init(self.allocator);
     defer event_arena.deinit();
     const event_alloc = event_arena.allocator();
@@ -395,7 +395,7 @@ fn drawMiddleTable(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !voi
     const middle_bar = win.child(.{
         .x_off = 0,
         .y_off = top_bar_height,
-        .height = .{ .limit = win.height - top_bar_height },
+        .height = win.height - top_bar_height,
         .border = .{
             .where = .all,
             .glyphs = .single_rounded,
@@ -427,16 +427,16 @@ fn drawMiddleTable(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !voi
 }
 
 /// Draws delete dialog.
-fn drawDeleteDialog(win: *vaxis.Window, top_bar_height: usize) !void {
+fn drawDeleteDialog(win: *vaxis.Window, top_bar_height: u16) !void {
     const dialog_text = "Are you sure you want to delete this file/folder?\nPress y/n to confirm/decline";
     const borders = 2;
     const max_width = "Are you sure you want to delete this file/folder?\n".len + borders;
 
     const dialog_bar = win.child(.{
-        .x_off = (win.width - max_width) / 2,
+        .x_off = (win.width - @as(u16, max_width)) / 2,
         .y_off = top_bar_height,
-        .width = .{ .limit = max_width },
-        .height = .{ .limit = 4 },
+        .width = max_width,
+        .height = 4,
         .border = .{
             .where = .all,
             .glyphs = .single_rounded,
@@ -448,21 +448,21 @@ fn drawDeleteDialog(win: *vaxis.Window, top_bar_height: usize) !void {
     };
     var segment_array = [_]vaxis.Cell.Segment{dialog_segment};
 
-    _ = try dialog_bar.print(segment_array[0..], .{});
+    _ = dialog_bar.print(segment_array[0..], .{});
 }
 
 /// Draws create dialog.
-fn drawCreateDialog(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !void {
+fn drawCreateDialog(self: *MyGui, win: *vaxis.Window, top_bar_height: u16) !void {
     const dialog_text = "(Optionally enter a path with subdirectories to be created for a file)\nEnter a file name to create:";
     const borders = 2;
     const max_width = "(Optionally enter a path with subdirectories to be created for a file)\n".len + borders;
     const max_height = 3;
 
     const dialog_bar = win.child(.{
-        .x_off = (win.width - max_width) / 2,
+        .x_off = (win.width - @as(u16, max_width)) / 2,
         .y_off = top_bar_height,
-        .width = .{ .limit = max_width },
-        .height = .{ .limit = max_height + borders },
+        .width = max_width,
+        .height = max_height + borders,
         .border = .{
             .where = .all,
             .glyphs = .single_rounded,
@@ -474,26 +474,26 @@ fn drawCreateDialog(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !vo
     };
     var segment_array = [_]vaxis.Cell.Segment{dialog_segment};
 
-    _ = try dialog_bar.print(segment_array[0..], .{});
+    _ = dialog_bar.print(segment_array[0..], .{});
 
     const input_height = 1;
     const child = win.child(.{
-        .x_off = (win.width - max_width) / 2 + borders / 2,
+        .x_off = (win.width - @as(u16, max_width)) / 2 + borders / 2,
         .y_off = top_bar_height + max_height,
-        .width = .{ .limit = max_width },
-        .height = .{ .limit = input_height },
+        .width = max_width,
+        .height = input_height,
     });
     self.text_input.draw(child);
 }
 
 /// Draws Table with found elements from on input text field
-fn drawFindTable(self: *MyGui, win: *vaxis.Window, top_bar_height: usize) !void {
+fn drawFindTable(self: *MyGui, win: *vaxis.Window, top_bar_height: u16) !void {
     const input_height = 1;
     const borders = 2;
     const child = win.child(.{
         .x_off = 0,
         .y_off = top_bar_height,
-        .height = .{ .limit = input_height + borders },
+        .height = input_height + borders,
         .border = .{
             .where = .all,
             .glyphs = .single_rounded,

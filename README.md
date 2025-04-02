@@ -23,7 +23,7 @@ zig build demo
 ![Demo](demo.gif)
 
 ```
-zig build tests
+zig build test
 ```
 
 ## Project structure

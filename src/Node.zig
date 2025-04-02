@@ -247,7 +247,7 @@ pub fn findFirstMatchingName(self: *Node, name: []const u8) ![]const u8 {
     try queue.insert(0, self);
 
     while (queue.items.len > 0) {
-        const current_node = queue.pop();
+        const current_node = queue.pop().?;
         if (std.mem.eql(u8, current_node.value.name, name)) {
             return current_node.getPathFromRoot();
         }
@@ -258,7 +258,7 @@ pub fn findFirstMatchingName(self: *Node, name: []const u8) ![]const u8 {
     return SearchError.NotFound;
 }
 
-/// Returns all nodes mathing passed substring.
+/// Returns all nodes matching passed substring.
 ///
 /// NOTE: As it returns ArrayList, don't forget to free it.
 pub fn findAllContainingName(self: *Node, name: []const u8) !std.ArrayList([]const u8) {
@@ -272,7 +272,7 @@ pub fn findAllContainingName(self: *Node, name: []const u8) !std.ArrayList([]con
     try queue.insert(0, self);
 
     while (queue.items.len > 0) {
-        const current_node = queue.pop();
+        const current_node = queue.pop().?;
         if (std.mem.indexOf(u8, current_node.value.name, name) != null) {
             try result.insert(0, try current_node.getPathFromRoot());
         }
